@@ -1,0 +1,317 @@
+       IDENTIFICATION DIVISION.
+       PROGRAM-ID. Z40113.
+       AUTHOR. MONIKA PUCHALSKA.
+       DATE-WRITTEN.  27/11/2024.
+       DATE-COMPILED. 27/11/2024.
+      
+      * A program that converts a decimal number to binary and vice *
+      * versa. The number to convert and the type of conversion are *
+      * given in SYSIN.
+
+       ENVIRONMENT DIVISION.
+       CONFIGURATION SECTION.
+       SOURCE-COMPUTER.
+           IBM-3090.
+       OBJECT-COMPUTER.
+           IBM-3090.
+       SPECIAL-NAMES.
+               DECIMAL-POINT IS COMMA.
+
+       INPUT-OUTPUT SECTION.
+       FILE-CONTROL.
+           SELECT S1DQOUT0 ASSIGN TO S1DQOUT0
+           FILE STATUS IS FS-S1DQOUT0.
+
+           SELECT S2DQVEG0 ASSIGN TO S2DQVEG0
+           FILE STATUS IS FS-S2DQVEG0.
+
+       DATA DIVISION.
+       FILE SECTION.
+       FD S1DQOUT0
+           RECORDING MODE IS F
+           DATA RECORD IS S1DQOUT0-REC.
+       01 S1DQOUT0-REC PIC X(50).
+
+       FD S2DQVEG0
+           RECORDING MODE IS F
+           DATA RECORD IS S2DQVEG0-REC.
+       01 S2DQVEG0-REC PIC X(50).
+
+       WORKING-STORAGE SECTION.
+
+      *********************
+      *     SWITCHES      *
+      *********************
+       01 FS.
+          05 FS-GENERAL                       PIC 99.
+             88 FS-GENERAL-OK                  VALUE 00 10.
+          05 FS-S1DQOUT0                      PIC 99.
+             88 FS-S1DQOUT0-OK                 VALUE 00 10.
+          05 FS-S2DQVEG0                      PIC 99.
+             88 FS-S2DQVEG0-OK                 VALUE 00 10.
+       01 SW.
+          05 SW-E1DQTST0-EOF                  PIC X VALUE 'N'.
+             88 SO-E1DQTST0-EOF-YES                 VALUE 'Y'.
+             88 SO-E1DQTST0-EOF-NO                  VALUE 'N'.
+          05 SW-FILE-ERROR.
+             10 SW-FILE-NAME         PIC X(8).
+                88 SO-FILE-E1DQTST0   VALUE 'E1DQTST0'.
+                88 SO-FILE-S1DQOUT0   VALUE 'S1DQOUT0'.
+                88 SO-FILE-S2DQVEG0   VALUE 'S2DQVEG0'.
+             10 SW-FILE-OPERATION    PIC X(5).
+                88 SO-FILE-OPERATION-OPEN  VALUE 'OPEN'.
+                88 SO-FILE-OPERATION-CLOSE VALUE 'CLOSE'.
+                88 SO-FILE-OPERATION-READ  VALUE 'READ'.
+                88 SO-FILE-OPERATION-WRITE VALUE 'WRITE'.
+      *********************
+      *     CONSTANTS     *
+      *********************
+       01 CT.
+          05 CT-MAX-ZD              PIC 9(5) VALUE 65535.
+          05 CT-MAX-BI              PIC 9(2) VALUE 16.
+      *********************
+      *     VARIABLES     *
+      *********************
+       01 WS.
+          05 WS-USERNAME             PIC X(7) VALUE 'TSOUS40'.
+          05 WS-IN.
+             10 WS-OPTION            PIC 9(1).
+                88 SO-INPUT-IS-DECIMAL  VALUE 1.
+                88 SO-INPUT-IS-BINARY   VALUE 2.
+             10 FILLER               PIC X(1).
+             10 WS-VALUE             PIC X(20).
+          05 WS-VALUE-TRIMMED        PIC X(16).
+          05 WS-DECIMAL-NUMBER       PIC 9(5).
+          05 WS-BINARY-NUMBER        PIC X(16) VALUE SPACES.
+          05 WS-LENGTH               PIC 9(16).
+          05 WS-TEMP                 PIC 9(5).
+          05 WS-REMAINDER            PIC 9(1).
+          05 WS-INDEX                PIC 9(2)   VALUE 16.
+          05 WS-ZERO-COUNT           PIC 9(2).
+          05 WS-ONE-COUNT            PIC 9(2).
+
+      ******************************************************************
+      *                                                                *
+      *                PROCEDURE DIVISION                              *
+      *                                                                *
+      ******************************************************************
+       PROCEDURE DIVISION.
+
+           PERFORM  1000-INIT
+      *
+           PERFORM  2000-PROCESS
+      *
+           PERFORM  3000-FINAL
+           .
+      *
+
+      /
+      ******************************************************************
+      *                    1000-INIT                                   *
+      *                                                                *
+      ******************************************************************
+       1000-INIT.
+      *
+           DISPLAY '1000-INIT'
+      * VALUE SPECIFIED IN SYSIN (X,V) CONTROLS WHICH PROCEDURE WILL BE
+      * EXECUTED. THE VALUE IS SAVED IN VARIABLE WS-IN
+           ACCEPT WS-IN FROM SYSIN
+           DISPLAY 'OPTION: ' WS-IN
+           IF WS-OPTION NOT = 1 AND WS-OPTION NOT = 2
+               DISPLAY 'WRONG KEY OPTION'
+               PERFORM 3000-FINAL
+           END-IF
+           .
+      /
+      ******************************************************************
+      *                                                                *
+      *                     2000-PROCESS                               *
+      *                                                                *
+      ******************************************************************
+      *
+       2000-PROCESS.
+      *
+           DISPLAY '2000-PROCESS'
+           EVALUATE TRUE
+              WHEN SO-INPUT-IS-DECIMAL
+                 PERFORM 2010-ZD-TO-BI
+              WHEN SO-INPUT-IS-BINARY
+                 PERFORM 2020-BI-TO-ZD
+              WHEN OTHER
+                 DISPLAY 'WRONG KEY WAS GIVEN'
+           END-EVALUATE
+           .
+      *
+       2010-ZD-TO-BI.
+      *
+           MOVE ZEROES TO WS-BINARY-NUMBER
+      *  PERFORM TEST IF THE INPUT VALUE IS NUMERIC AND
+      *  EQUIVALENT TO 16 BINARY BITS, I.E. 655355
+           PERFORM 2050-TEST-DECIMAL-VALUE
+      * SET THE WS-INDEX TO THE END OF THE BINARY NUMBER
+           MOVE CT-MAX-BI TO WS-INDEX
+      * DIVIDE THE NUMBER BY 2 UNTIL IT IS 0 AND STORE THE REMAINDER
+      * AT THE WS-BINARY-NUMBER AT THE POSITION WS-INDEX
+           PERFORM UNTIL WS-DECIMAL-NUMBER = 0
+              DIVIDE WS-DECIMAL-NUMBER BY 2 GIVING WS-DECIMAL-NUMBER
+                  REMAINDER WS-REMAINDER
+              MOVE WS-REMAINDER TO WS-BINARY-NUMBER(WS-INDEX:1)
+              SUBTRACT 1 FROM WS-INDEX
+           END-PERFORM
+      *    MOVE FUNCTION TRIM(WS-BINARY-NUMBER LEADING)
+      *                                       TO WS-BINARY-NUMBER
+      *    STRING
+      *      WS-VALUE DELIMITED BY SPACE INTO WS-VALUE-TRIMMED
+      *    END-STRING
+           MOVE ZEROES TO WS-LENGTH
+           INSPECT WS-VALUE TALLYING WS-LENGTH
+                 FOR CHARACTERS BEFORE INITIAL SPACE
+           DISPLAY 'DECIMAL TO  BINARY FOR VALUE: '
+                WS-VALUE(1:WS-LENGTH) ' IS: ' WS-BINARY-NUMBER
+           .
+      *
+       2020-BI-TO-ZD.
+      *
+      * CHECK IF BINARY NUMBER IS GIVEN CORRECT AND IF UP TO 16 BITS
+           PERFORM 2100-TEST-BINARY-VALUE
+      * IF THE NUMBER IS CORRECT, PROCEED WITH CONVERSION
+           MOVE ZEROES TO WS-DECIMAL-NUMBER
+           MOVE ZEROES TO WS-LENGTH
+           MOVE ZEROES TO WS-INDEX
+           MOVE WS-VALUE TO WS-BINARY-NUMBER
+           INSPECT WS-VALUE
+              TALLYING WS-LENGTH FOR CHARACTERS BEFORE
+                               INITIAL SPACE
+      *    DISPLAY WS-LENGTH ', ' WS-BINARY-NUMBER
+           PERFORM VARYING WS-INDEX FROM WS-LENGTH BY -1
+                                          UNTIL WS-INDEX < 1
+             IF WS-BINARY-NUMBER(WS-INDEX:1) = '1'
+              COMPUTE WS-TEMP = 2 ** (WS-LENGTH - WS-INDEX)
+              ADD WS-TEMP TO WS-DECIMAL-NUMBER
+             END-IF
+           END-PERFORM
+           DISPLAY 'BINARY TO DECIMAL FOR VALUE: '
+             WS-BINARY-NUMBER ' IS : ' WS-DECIMAL-NUMBER
+           .
+      *
+        2050-TEST-DECIMAL-VALUE.
+      *
+           MOVE ZEROES TO WS-DECIMAL-NUMBER
+      * IF THE INPUT IS NUMERIC AND EQUIVALENT TO 16 BINARY BITS,
+      * I.E. 655355
+           IF FUNCTION TEST-NUMVAL(WS-VALUE) NOT = 0
+               DISPLAY 'VALUE IS NOT NUMERIC'
+               PERFORM 3000-FINAL
+           END-IF
+      * IF VALUE EQUIVALENT TO 16 BINARY BITS, I.E. 655355
+           COMPUTE WS-DECIMAL-NUMBER = FUNCTION NUMVAL(WS-VALUE)
+           IF WS-DECIMAL-NUMBER > CT-MAX-ZD
+               DISPLAY 'VALUE IS HIGHER THAN 65535'
+               PERFORM 3000-FINAL
+           END-IF
+           .
+      *
+       2100-TEST-BINARY-VALUE.
+      *
+           MOVE ZEROES TO WS-LENGTH
+           MOVE ZEROES TO WS-INDEX
+           INSPECT WS-VALUE
+               TALLYING WS-LENGTH FOR CHARACTERS BEFORE
+                                    INITIAL SPACE
+      * TEST IF VALUE IS NOT MORE THAN 16 BITS AND IF ONLY DIGITS 0/1
+           IF WS-LENGTH < CT-MAX-BI + 1
+                INSPECT WS-VALUE(1:WS-LENGTH) TALLYING WS-ZERO-COUNT
+                               FOR ALL '0'
+                INSPECT WS-VALUE(1:WS-LENGTH) TALLYING WS-ONE-COUNT
+                               FOR ALL '1'
+                IF (WS-ZERO-COUNT + WS-ONE-COUNT) < WS-LENGTH
+                     DISPLAY 'VALUES ARE NOT 0 OR 1'
+                     PERFORM 3000-FINAL
+                END-IF
+           ELSE
+                DISPLAY 'THE INPUT VALUE IS LONGER THAN 16 BITS'
+                PERFORM 3000-FINAL
+           END-IF
+           .
+      ******************************************************************
+      *                                                                *
+      *                       3000-FINAL                               *
+      *                                                                *
+      ******************************************************************
+      *
+      *
+       3000-FINAL.
+      *
+           DISPLAY '3000-FINAL'
+           STOP RUN
+           .
+        4000-CHECK-FILE-STATUS.
+           IF NOT FS-GENERAL-OK
+              DISPLAY 'ERROR IN FILE PROCESSING'
+              DISPLAY 'FILE:        ' SW-FILE-NAME
+              DISPLAY 'OPERATION:   ' SW-FILE-OPERATION
+              DISPLAY 'FILE STATUS: ' FS-GENERAL
+              PERFORM 3000-FINAL
+           END-IF
+           .
+      ******************************************************************
+        6030-OPEN-S1DQOUT0.
+      ******************************************************************
+           OPEN OUTPUT S1DQOUT0
+           MOVE FS-S1DQOUT0                 TO FS-GENERAL
+           SET SO-FILE-S1DQOUT0             TO TRUE
+           SET SO-FILE-OPERATION-OPEN       TO TRUE
+           PERFORM 4000-CHECK-FILE-STATUS
+           .
+      ******************************************************************
+        6040-WRITE-S1DQOUT0.
+      ******************************************************************
+           WRITE S1DQOUT0-REC
+           MOVE FS-S1DQOUT0                 TO FS-GENERAL
+           SET SO-FILE-S1DQOUT0             TO TRUE
+           SET SO-FILE-OPERATION-WRITE      TO TRUE
+           PERFORM 4000-CHECK-FILE-STATUS
+           .
+      ******************************************************************
+        6050-CLOSE-S1DQOUT0.
+      ******************************************************************
+           CLOSE S1DQOUT0
+           MOVE FS-S1DQOUT0                 TO FS-GENERAL
+           SET SO-FILE-S1DQOUT0             TO TRUE
+           SET SO-FILE-OPERATION-CLOSE      TO TRUE
+           PERFORM 4000-CHECK-FILE-STATUS
+           .
+      ******************************************************************
+        6060-OPEN-S2DQVEG0.
+      ******************************************************************
+           OPEN OUTPUT S2DQVEG0
+           MOVE FS-S2DQVEG0                 TO FS-GENERAL
+           SET SO-FILE-S2DQVEG0             TO TRUE
+           SET SO-FILE-OPERATION-OPEN       TO TRUE
+           PERFORM 4000-CHECK-FILE-STATUS
+           .
+      ******************************************************************
+        6070-WRITE-S2DQVEG0.
+      ******************************************************************
+           WRITE S2DQVEG0-REC
+           MOVE FS-S2DQVEG0                 TO FS-GENERAL
+           SET SO-FILE-S2DQVEG0             TO TRUE
+           SET SO-FILE-OPERATION-WRITE      TO TRUE
+           PERFORM 4000-CHECK-FILE-STATUS
+           .
+      ******************************************************************
+        6080-CLOSE-S2DQVEG0.
+      ******************************************************************
+           CLOSE S2DQVEG0
+           MOVE FS-S2DQVEG0                 TO FS-GENERAL
+           SET SO-FILE-S2DQVEG0             TO TRUE
+           SET SO-FILE-OPERATION-CLOSE      TO TRUE
+           PERFORM 4000-CHECK-FILE-STATUS
+           .
+        6100-OPEN-FILES.
+           PERFORM 6030-OPEN-S1DQOUT0
+           .
+        6110-CLOSE-FILES.
+           PERFORM 6050-CLOSE-S1DQOUT0
+           .
+      ******************************************************************

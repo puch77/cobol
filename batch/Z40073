@@ -1,0 +1,379 @@
+       IDENTIFICATION DIVISION.
+       PROGRAM-ID. Z40073.
+       AUTHOR. MONIKA PUCHALSKA.
+       DATE-WRITTEN.  22/11/2024.
+       DATE-COMPILED. 22/11/2024.
+
+      ******************************************************************
+      *                         --------                               *
+      *                         ZZ303001                              *
+      *                         --------                               *
+      *   DUMMY PROGRAM
+      *                                                                *
+      *   DB2 TABLES             ACCESS                                *
+      *   ----------             ------                                *
+      *                                                                *
+      ******************************************************************
+      *                                                                *
+      * A program that checks numbers from 1 to 1000 for divisibility 
+      * by 2,3,5,7,11. Numbers divisible by each of the given numbers 
+      * are to be printed to a separate file, i.e. one file for 
+      * divisibility by 2, another for divisibility by 3, etc.         *
+      * ------ ------- -------- ---------------------------------------*
+      *        TSOUS40 22/11/2024 FIRST VERSION                        *
+      ******************************************************************
+
+       ENVIRONMENT DIVISION.
+       CONFIGURATION SECTION.
+       SOURCE-COMPUTER.
+           IBM-3090.
+       OBJECT-COMPUTER.
+           IBM-3090.
+       SPECIAL-NAMES.
+       INPUT-OUTPUT SECTION.
+       FILE-CONTROL.
+           SELECT E1DQTST0 ASSIGN TO E1DQTST0
+           FILE STATUS IS FS-E1DQTST0.
+
+           SELECT S1DQBY20 ASSIGN TO S1DQBY20
+           FILE STATUS IS FS-S1DQBY20.
+
+           SELECT S2DQBY30 ASSIGN TO S2DQBY30
+           FILE STATUS IS FS-S2DQBY30.
+
+           SELECT S3DQBY50 ASSIGN TO S3DQBY50
+           FILE STATUS IS FS-S3DQBY50.
+
+           SELECT S4DQBY70 ASSIGN TO S4DQBY70
+           FILE STATUS IS FS-S4DQBY70.
+
+           SELECT S5DQB110 ASSIGN TO S5DQB110
+           FILE STATUS IS FS-S5DQB110.
+
+       DATA DIVISION.
+       FILE SECTION.
+       FD E1DQTST0
+           RECORDING MODE IS F
+           DATA RECORD IS E1DQTST0-REC.
+       01 E1DQTST0-REC PIC X(50).
+
+       FD S1DQBY20
+           RECORDING MODE IS F
+           DATA RECORD IS S1DQBY20-REC.
+       01 S1DQBY20-REC PIC X(50).
+
+       FD S2DQBY30
+           RECORDING MODE IS F
+           DATA RECORD IS S2DQBY30-REC.
+       01 S2DQBY30-REC PIC X(50).
+
+       FD S3DQBY50
+           RECORDING MODE IS F
+           DATA RECORD IS S3DQBY50-REC.
+       01 S3DQBY50-REC PIC X(50).
+
+       FD S4DQBY70
+           RECORDING MODE IS F
+           DATA RECORD IS S4DQBY70-REC.
+       01 S4DQBY70-REC PIC X(50).
+
+       FD S5DQB110
+           RECORDING MODE IS F
+           DATA RECORD IS S5DQB110-REC.
+       01 S5DQB110-REC PIC X(50).
+
+       WORKING-STORAGE SECTION.
+
+      *********************
+      *     SWITCHES      *
+      *********************
+       01 FS.
+          05 FS-GENERAL                       PIC 99.
+             88 FS-GENERAL-OK                  VALUE 00 10.
+          05 FS-E1DQTST0                      PIC 99.
+             88 FS-E1DQTST0-OK                 VALUE 00 10.
+          05 FS-S1DQBY20                      PIC 99.
+             88 FS-S1DQBY20-OK                 VALUE 00 10.
+          05 FS-S2DQBY30                      PIC 99.
+             88 FS-S2DQBY30-OK                 VALUE 00 10.
+          05 FS-S3DQBY50                      PIC 99.
+             88 FS-S3DQBY50-OK                 VALUE 00 10.
+          05 FS-S4DQBY70                      PIC 99.
+             88 FS-S4DQBY70-OK                 VALUE 00 10.
+          05 FS-S5DQB110                      PIC 99.
+             88 FS-S5DQB110-OK                 VALUE 00 10.
+       01 SW.
+          05 SW-E1DQTST0-EOF                  PIC X VALUE 'N'.
+             88 SO-E1DQTST0-EOF-YES                 VALUE 'Y'.
+             88 SO-E1DQTST0-EOF-NO                  VALUE 'N'.
+          05 SW-FILE-ERROR.
+             10 SW-FILE-NAME         PIC X(8).
+                88 SO-FILE-E1DQTST0   VALUE 'E1DQTST0'.
+                88 SO-FILE-S1DQBY20   VALUE 'S1DQBY20'.
+                88 SO-FILE-S2DQBY30   VALUE 'S2DQBY30'.
+                88 SO-FILE-S3DQBY50   VALUE 'S3DQBY50'.
+                88 SO-FILE-S4DQBY70   VALUE 'S4DQBY70'.
+                88 SO-FILE-S5DQB110   VALUE 'S5DQB110'.
+             10 SW-FILE-OPERATION    PIC X(5).
+                88 SO-FILE-OPERATION-OPEN  VALUE 'OPEN'.
+                88 SO-FILE-OPERATION-CLOSE VALUE 'CLOSE'.
+                88 SO-FILE-OPERATION-READ  VALUE 'READ'.
+                88 SO-FILE-OPERATION-WRITE VALUE 'WRITE'.
+      *********************
+      *     CONSTANTS     *
+      *********************
+      *********************
+      *     VARIABLES     *
+      *********************
+       01 WS.
+          05 WS-USERNAME             PIC X(7) VALUE 'TSOUS40'.
+          05 WS-IN                   PIC X(10).
+          05 WS-INDEX                PIC 9(1).
+      ******************************************************************
+      *                                                                *
+      *                PROCEDURE DIVISION                              *
+      *                                                                *
+      ******************************************************************
+       PROCEDURE DIVISION.
+
+           PERFORM  1000-INIT
+      *
+           PERFORM  2000-PROCESS
+      *
+           PERFORM  3000-FINAL
+           .
+      *
+
+      /
+      ******************************************************************
+      *                    1000-INIT                                   *
+      *                                                                *
+      ******************************************************************
+       1000-INIT.
+      *
+           DISPLAY '1000-INIT'
+           .
+      /
+      ******************************************************************
+      *                                                                *
+      *                     2000-PROCESS                               *
+      *                                                                *
+      ******************************************************************
+      *
+       2000-PROCESS.
+      *
+           DISPLAY '2000-PROCESS'
+           PERFORM 6100-OPEN-FILES
+           PERFORM VARYING WS-INDEX FROM 1 BY 1 UNTIL WS-INDEX >1000
+             IF FUNCTION MOD(WS-INDEX, 2) = 0
+                MOVE WS-INDEX TO S1DQBY20-REC
+                PERFORM 6040-WRITE-S1DQBY20
+             END-IF
+             IF FUNCTION MOD(WS-INDEX, 3) = 0
+                MOVE WS-INDEX TO S2DQBY30-REC
+                PERFORM 6070-WRITE-S2DQBY30
+             END-IF
+             IF FUNCTION MOD(WS-INDEX, 5) = 0
+                MOVE WS-INDEX TO S3DQBY50-REC
+                PERFORM 6071-WRITE-S3DQBY50
+             END-IF
+             IF FUNCTION MOD(WS-INDEX,7) = 0
+                MOVE WS-INDEX TO S4DQBY70-REC
+                PERFORM 6072-WRITE-S4DQBY70
+             END-IF
+             IF FUNCTION MOD(WS-INDEX, 11) = 0
+                MOVE WS-INDEX TO S5DQB110-REC
+                PERFORM 6073-WRITE-S5DQB110
+             END-IF
+           END-PERFORM.
+           PERFORM 6110-CLOSE-FILES
+           .
+      ******************************************************************
+      *                                                                *
+      *                       3000-FINAL                               *
+      *                                                                *
+      ******************************************************************
+      *
+       3000-FINAL.
+      *
+           DISPLAY '3000-FINAL'
+           STOP RUN
+           .
+        4000-CHECK-FILE-STATUS.
+           IF NOT FS-GENERAL-OK
+              DISPLAY 'ERROR IN FILE PROCESSING'
+              DISPLAY 'FILE:        ' SW-FILE-NAME
+              DISPLAY 'OPERATION:   ' SW-FILE-OPERATION
+              DISPLAY 'FILE STATUS: ' FS-GENERAL
+              PERFORM 3000-FINAL
+           END-IF
+           .
+      ******************************************************************
+        6000-OPEN-E1DQTST0.
+      ******************************************************************
+           OPEN INPUT E1DQTST0
+           MOVE FS-E1DQTST0                 TO FS-GENERAL
+           SET SO-FILE-E1DQTST0             TO TRUE
+           SET SO-FILE-OPERATION-OPEN       TO TRUE
+           PERFORM 4000-CHECK-FILE-STATUS
+           .
+      ******************************************************************
+        6010-READ-E1DQTST0.
+      ******************************************************************
+           READ E1DQTST0 INTO WS-IN
+             AT END SET SO-E1DQTST0-EOF-YES TO TRUE
+           MOVE FS-E1DQTST0                 TO FS-GENERAL
+           SET SO-FILE-E1DQTST0             TO TRUE
+           SET SO-FILE-OPERATION-READ       TO TRUE
+           PERFORM 4000-CHECK-FILE-STATUS
+           .
+      ******************************************************************
+        6020-CLOSE-E1DQTST0.
+      ******************************************************************
+           CLOSE E1DQTST0
+           MOVE FS-E1DQTST0                 TO FS-GENERAL
+           SET SO-FILE-E1DQTST0             TO TRUE
+           SET SO-FILE-OPERATION-CLOSE      TO TRUE
+           PERFORM 4000-CHECK-FILE-STATUS
+           .
+      ******************************************************************
+        6030-OPEN-S1DQBY20.
+      ******************************************************************
+           OPEN OUTPUT S1DQBY20
+           MOVE FS-S1DQBY20                 TO FS-GENERAL
+           SET SO-FILE-S1DQBY20             TO TRUE
+           SET SO-FILE-OPERATION-OPEN       TO TRUE
+           PERFORM 4000-CHECK-FILE-STATUS
+           .
+      ******************************************************************
+        6040-WRITE-S1DQBY20.
+      ******************************************************************
+           WRITE S1DQBY20-REC
+           MOVE FS-S1DQBY20                 TO FS-GENERAL
+           SET SO-FILE-S1DQBY20             TO TRUE
+           SET SO-FILE-OPERATION-WRITE      TO TRUE
+           PERFORM 4000-CHECK-FILE-STATUS
+           .
+      ******************************************************************
+        6050-CLOSE-S1DQBY20.
+      ******************************************************************
+           CLOSE S1DQBY20
+           MOVE FS-S1DQBY20                 TO FS-GENERAL
+           SET SO-FILE-S1DQBY20             TO TRUE
+           SET SO-FILE-OPERATION-CLOSE      TO TRUE
+           PERFORM 4000-CHECK-FILE-STATUS
+           .
+      ******************************************************************
+        6060-OPEN-S2DQBY30.
+      ******************************************************************
+           OPEN OUTPUT S2DQBY30
+           MOVE FS-S2DQBY30                 TO FS-GENERAL
+           SET SO-FILE-S2DQBY30             TO TRUE
+           SET SO-FILE-OPERATION-OPEN       TO TRUE
+           PERFORM 4000-CHECK-FILE-STATUS
+           .
+        6061-OPEN-S3DQBY50.
+      ******************************************************************
+           OPEN OUTPUT S3DQBY50
+           MOVE FS-S3DQBY50                 TO FS-GENERAL
+           SET SO-FILE-S3DQBY50             TO TRUE
+           SET SO-FILE-OPERATION-OPEN       TO TRUE
+           PERFORM 4000-CHECK-FILE-STATUS
+           .
+         6062-OPEN-S4DQBY70.
+      ******************************************************************
+            OPEN OUTPUT S4DQBY70
+            MOVE FS-S4DQBY70                 TO FS-GENERAL
+            SET SO-FILE-S4DQBY70             TO TRUE
+            SET SO-FILE-OPERATION-OPEN       TO TRUE
+            PERFORM 4000-CHECK-FILE-STATUS
+            .
+        6063-OPEN-S5DQB110.
+      ******************************************************************
+           OPEN OUTPUT S5DQB110
+           MOVE FS-S5DQB110                 TO FS-GENERAL
+           SET SO-FILE-S5DQB110             TO TRUE
+           SET SO-FILE-OPERATION-OPEN       TO TRUE
+           PERFORM 4000-CHECK-FILE-STATUS
+           .
+        6070-WRITE-S2DQBY30.
+      ******************************************************************
+           WRITE S2DQBY30-REC
+           MOVE FS-S2DQBY30                 TO FS-GENERAL
+           SET SO-FILE-S2DQBY30             TO TRUE
+           SET SO-FILE-OPERATION-WRITE      TO TRUE
+           PERFORM 4000-CHECK-FILE-STATUS
+           .
+        6071-WRITE-S3DQBY50.
+      ******************************************************************
+           WRITE S3DQBY50-REC
+           MOVE FS-S3DQBY50                 TO FS-GENERAL
+           SET SO-FILE-S3DQBY50             TO TRUE
+           SET SO-FILE-OPERATION-WRITE      TO TRUE
+           PERFORM 4000-CHECK-FILE-STATUS
+           .
+        6072-WRITE-S4DQBY70.
+      ******************************************************************
+           WRITE S4DQBY70-REC
+           MOVE FS-S4DQBY70                 TO FS-GENERAL
+           SET SO-FILE-S4DQBY70             TO TRUE
+           SET SO-FILE-OPERATION-WRITE      TO TRUE
+           PERFORM 4000-CHECK-FILE-STATUS
+           .
+        6073-WRITE-S5DQB110.
+      ******************************************************************
+           WRITE S5DQB110-REC
+           MOVE FS-S5DQB110                 TO FS-GENERAL
+           SET SO-FILE-S5DQB110             TO TRUE
+           SET SO-FILE-OPERATION-WRITE      TO TRUE
+           PERFORM 4000-CHECK-FILE-STATUS
+           .
+        6080-CLOSE-S2DQBY30.
+      ******************************************************************
+           CLOSE S2DQBY30
+           MOVE FS-S2DQBY30                 TO FS-GENERAL
+           SET SO-FILE-S2DQBY30             TO TRUE
+           SET SO-FILE-OPERATION-CLOSE      TO TRUE
+           PERFORM 4000-CHECK-FILE-STATUS
+           .
+        6081-CLOSE-S3DQBY50.
+      ******************************************************************
+           CLOSE S3DQBY50
+           MOVE FS-S3DQBY50                 TO FS-GENERAL
+           SET SO-FILE-S3DQBY50             TO TRUE
+           SET SO-FILE-OPERATION-CLOSE      TO TRUE
+           PERFORM 4000-CHECK-FILE-STATUS
+           .
+        6082-CLOSE-S4DQBY70.
+      ******************************************************************
+           CLOSE S4DQBY70
+           MOVE FS-S4DQBY70                 TO FS-GENERAL
+           SET SO-FILE-S4DQBY70             TO TRUE
+           SET SO-FILE-OPERATION-CLOSE      TO TRUE
+           PERFORM 4000-CHECK-FILE-STATUS
+           .
+        6083-CLOSE-S5DQB110.
+      ******************************************************************
+           CLOSE S5DQB110
+           MOVE FS-S5DQB110                 TO FS-GENERAL
+           SET SO-FILE-S5DQB110             TO TRUE
+           SET SO-FILE-OPERATION-CLOSE      TO TRUE
+           PERFORM 4000-CHECK-FILE-STATUS
+           .
+        6100-OPEN-FILES.
+      *    PERFORM 6000-OPEN-E1DQTST0
+           PERFORM 6030-OPEN-S1DQBY20
+           PERFORM 6060-OPEN-S2DQBY30
+           PERFORM 6061-OPEN-S3DQBY50
+           PERFORM 6062-OPEN-S4DQBY70
+           PERFORM 6063-OPEN-S5DQB110
+           .
+        6110-CLOSE-FILES.
+      *    PERFORM 6020-CLOSE-E1DQTST0
+           PERFORM 6050-CLOSE-S1DQBY20
+           PERFORM 6080-CLOSE-S2DQBY30
+           PERFORM 6081-CLOSE-S3DQBY50
+           PERFORM 6082-CLOSE-S4DQBY70
+           PERFORM 6083-CLOSE-S5DQB110
+           .
+      ******************************************************************

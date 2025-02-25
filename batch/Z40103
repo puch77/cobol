@@ -1,0 +1,317 @@
+       IDENTIFICATION DIVISION.
+       PROGRAM-ID. Z40103.
+       AUTHOR. MONIKA PUCHALSKA.
+       DATE-WRITTEN.  26/11/2024.
+       DATE-COMPILED. 26/11/2024.
+
+      * Batch program that returns to the file all possible 3-element *
+      * combinations without repetitions of numbers from 1 to 20.     *
+      * Additionally, an option that allows calculating combinations  *
+      * with repetitions, permutations without repetitions and        *
+      * permutations with repetitions.
+      * Which option the program will work with is determined based on* 
+      * the parameter given in SYSIN, e.g. value 1 for combinations   *
+      * without repetitions, 2 for combinations with repetitions, etc.*
+
+       ENVIRONMENT DIVISION.
+       CONFIGURATION SECTION.
+       SOURCE-COMPUTER.
+           IBM-3090.
+       OBJECT-COMPUTER.
+           IBM-3090.
+       SPECIAL-NAMES.
+               DECIMAL-POINT IS COMMA.
+
+       INPUT-OUTPUT SECTION.
+       FILE-CONTROL.
+           SELECT S1DQOUT0 ASSIGN TO S1DQOUT0
+           FILE STATUS IS FS-S1DQOUT0.
+
+           SELECT S2DQVEG0 ASSIGN TO S2DQVEG0
+           FILE STATUS IS FS-S2DQVEG0.
+
+       DATA DIVISION.
+       FILE SECTION.
+       FD S1DQOUT0
+           RECORDING MODE IS F
+           DATA RECORD IS S1DQOUT0-REC.
+       01 S1DQOUT0-REC PIC X(50).
+
+       FD S2DQVEG0
+           RECORDING MODE IS F
+           DATA RECORD IS S2DQVEG0-REC.
+       01 S2DQVEG0-REC PIC X(50).
+
+       WORKING-STORAGE SECTION.
+
+      *********************
+      *     SWITCHES      *
+      *********************
+       01 FS.
+          05 FS-GENERAL                       PIC 99.
+             88 FS-GENERAL-OK                  VALUE 00 10.
+          05 FS-S1DQOUT0                      PIC 99.
+             88 FS-S1DQOUT0-OK                 VALUE 00 10.
+          05 FS-S2DQVEG0                      PIC 99.
+             88 FS-S2DQVEG0-OK                 VALUE 00 10.
+       01 SW.
+          05 SW-E1DQTST0-EOF                  PIC X VALUE 'N'.
+             88 SO-E1DQTST0-EOF-YES                 VALUE 'Y'.
+             88 SO-E1DQTST0-EOF-NO                  VALUE 'N'.
+          05 SW-FILE-ERROR.
+             10 SW-FILE-NAME         PIC X(8).
+                88 SO-FILE-E1DQTST0   VALUE 'E1DQTST0'.
+                88 SO-FILE-S1DQOUT0   VALUE 'S1DQOUT0'.
+                88 SO-FILE-S2DQVEG0   VALUE 'S2DQVEG0'.
+             10 SW-FILE-OPERATION    PIC X(5).
+                88 SO-FILE-OPERATION-OPEN  VALUE 'OPEN'.
+                88 SO-FILE-OPERATION-CLOSE VALUE 'CLOSE'.
+                88 SO-FILE-OPERATION-READ  VALUE 'READ'.
+                88 SO-FILE-OPERATION-WRITE VALUE 'WRITE'.
+      *********************
+      *     CONSTANTS     *
+      *********************
+       01 CT.
+          05 CT-MAX-VALUE            PIC 99 VALUE 20.
+      *********************
+      *     VARIABLES     *
+      *********************
+       01 WS.
+          05 WS-USERNAME             PIC X(7) VALUE 'TSOUS40'.
+          05 WS-IN                   PIC X(7).
+          05 WS-OPTION               PIC X(1).
+             88 SO-COMBINATION-WITHOUT-REP   VALUE '1'.
+             88 SO-COMBINATION-WITH-REP      VALUE '2'.
+             88 SO-PERMUTATION-WITHOUT-REP   VALUE '3'.
+             88 SO-PERMUTATION-WITH-REP      VALUE '4'.
+          05 WS-OUTPUT-RECORD        PIC X(20).
+          05 WS-I                    PIC 99 VALUE 1.
+          05 WS-J                    PIC 99 VALUE 1.
+          05 WS-J-START              PIC 99 VALUE 0.
+          05 WS-K                    PIC 99 VALUE 1.
+          05 WS-K-START              PIC 99 VALUE 0.
+      ******************************************************************
+      *                                                                *
+      *                PROCEDURE DIVISION                              *
+      *                                                                *
+      ******************************************************************
+       PROCEDURE DIVISION.
+
+           PERFORM  1000-INIT
+      *
+           PERFORM  2000-PROCESS
+      *
+           PERFORM  3000-FINAL
+           .
+      *
+
+      /
+      ******************************************************************
+      *                    1000-INIT                                   *
+      *                                                                *
+      ******************************************************************
+       1000-INIT.
+      *
+           DISPLAY '1000-INIT'
+      * VALUE SPECIFIED IN SYSIN (1-4) CONTROLS WHICH PROCEDURE WILL BE
+      * EXECUTED. THE VALUE IS SAVED IN VARIABLE WS-OPTION
+           ACCEPT WS-OPTION FROM SYSIN
+           DISPLAY 'OPTION: ' WS-OPTION
+           .
+      /
+      ******************************************************************
+      *                                                                *
+      *                     2000-PROCESS                               *
+      *                                                                *
+      ******************************************************************
+      *
+       2000-PROCESS.
+      *
+           DISPLAY '2000-PROCESS'
+           PERFORM 6030-OPEN-S1DQOUT0
+      * WHEN PARAMETER GIVEN BY SYSIN EQUAL TO:
+      * SO-COMBINATION-WITHOUT-REP(1):
+      *                       PERFORM COMBINATION WITHOUT REPETITIONS;
+      * SO-COMBINATION-WITH-REP(2):
+      *                       PERFORM COMBINATION WITH REPETITIONS;
+      * SO-PERMUTATION-WITHOUT-REP(3):
+      *                       PERFORM PERMUTATION WITHOUT REPETITIONS;
+      * SO-PERMUTATION-WITH-REP(4):
+      *                       PERFORM PERMUTATION WITH REPETITIONS;
+      * OTHER - IF USER ENTERS A VALUE OUTSIDE THE RANGE 1-4, AN ERROR
+      * MESSAGE WILL BE DISPLAYED
+      * ALL CALCULATIONS FOR 3-ELEMENT COMBINATIONS FOR NUMBERS 1 TO 20
+           EVALUATE TRUE
+             WHEN SO-COMBINATION-WITHOUT-REP
+              PERFORM 2010-COMBINATIONS-WITHOUT-REP
+             WHEN SO-COMBINATION-WITH-REP
+              PERFORM 2020-COMBINATIONS-WITH-REP
+             WHEN SO-PERMUTATION-WITHOUT-REP
+              PERFORM 2030-PERMUTATIONS-WITHOUT-REP
+             WHEN SO-PERMUTATION-WITH-REP
+              PERFORM 2040-PERMUTATIONS-WITH-REP
+             WHEN OTHER
+              DISPLAY 'WRONG KEY VALUE: ' WS-OPTION
+                      ' ACCEPTABLE KEY VALUES BETWEEN 1 AND 4'
+              PERFORM 3000-FINAL
+           END-EVALUATE
+           PERFORM 6050-CLOSE-S1DQOUT0
+           .
+      *
+       2010-COMBINATIONS-WITHOUT-REP.
+      *
+           PERFORM VARYING WS-I FROM 1 BY 1
+                                        UNTIL WS-I > CT-MAX-VALUE - 2
+             ADD 1 TO WS-I GIVING WS-J-START
+             PERFORM VARYING WS-J FROM WS-J-START BY 1
+                                        UNTIL WS-J > CT-MAX-VALUE - 1
+                 ADD 1 TO WS-J GIVING WS-K-START
+                 PERFORM VARYING WS-K FROM WS-K-START BY 1
+                                        UNTIL WS-K > CT-MAX-VALUE
+                     PERFORM 2100-BUILD-STRING-AND-WRITE
+                 END-PERFORM
+             END-PERFORM
+           END-PERFORM
+           .
+      *
+       2020-COMBINATIONS-WITH-REP.
+      *
+           PERFORM VARYING WS-I FROM 1 BY 1
+                                       UNTIL WS-I > CT-MAX-VALUE
+             PERFORM VARYING WS-J FROM WS-I BY 1
+                                       UNTIL WS-J > CT-MAX-VALUE
+                 PERFORM VARYING WS-K FROM WS-J BY 1
+                                       UNTIL WS-K > CT-MAX-VALUE
+                     PERFORM 2100-BUILD-STRING-AND-WRITE
+                 END-PERFORM
+             END-PERFORM
+           END-PERFORM
+           .
+      *
+       2030-PERMUTATIONS-WITHOUT-REP.
+      *
+           PERFORM VARYING WS-I FROM 1 BY 1
+                                       UNTIL WS-I > CT-MAX-VALUE
+             PERFORM VARYING WS-J FROM 1 BY 1
+                                       UNTIL WS-J > CT-MAX-VALUE
+               IF WS-I NOT = WS-J
+                 PERFORM VARYING WS-K FROM 1 BY 1
+                                       UNTIL WS-K > CT-MAX-VALUE
+                   IF WS-K NOT = WS-I AND WS-K NOT = WS-J
+                     PERFORM 2100-BUILD-STRING-AND-WRITE
+                   END-IF
+                 END-PERFORM
+               END-IF
+             END-PERFORM
+           END-PERFORM
+           .
+      *
+       2040-PERMUTATIONS-WITH-REP.
+      *
+           PERFORM VARYING WS-I FROM 1 BY 1 UNTIL WS-I > CT-MAX-VALUE
+             PERFORM VARYING WS-J FROM 1 BY 1
+                                         UNTIL WS-J > CT-MAX-VALUE
+                 PERFORM VARYING WS-K FROM 1 BY 1
+                                         UNTIL WS-K > CT-MAX-VALUE
+                     PERFORM 2100-BUILD-STRING-AND-WRITE
+                 END-PERFORM
+             END-PERFORM
+           END-PERFORM
+           .
+      *
+        2100-BUILD-STRING-AND-WRITE.
+      *
+      * CLEARING TEXT FIELDS BEFORE SAVING NEW DATA
+           MOVE SPACES TO WS-OUTPUT-RECORD
+      * COMBINING VALUES INTO ONE FIELD
+           STRING
+              WS-I DELIMITED BY SIZE ","
+              WS-J DELIMITED BY SIZE ","
+              WS-K DELIMITED BY SIZE
+                INTO WS-OUTPUT-RECORD
+           END-STRING
+           MOVE WS-OUTPUT-RECORD TO S1DQOUT0-REC
+           PERFORM 6040-WRITE-S1DQOUT0
+           .
+      ******************************************************************
+      *                                                                *
+      *                       3000-FINAL                               *
+      *                                                                *
+      ******************************************************************
+      *
+      *
+       3000-FINAL.
+      *
+           DISPLAY '3000-FINAL'
+           STOP RUN
+           .
+        4000-CHECK-FILE-STATUS.
+           IF NOT FS-GENERAL-OK
+              DISPLAY 'ERROR IN FILE PROCESSING'
+              DISPLAY 'FILE:        ' SW-FILE-NAME
+              DISPLAY 'OPERATION:   ' SW-FILE-OPERATION
+              DISPLAY 'FILE STATUS: ' FS-GENERAL
+              PERFORM 3000-FINAL
+           END-IF
+           .
+      ******************************************************************
+        6030-OPEN-S1DQOUT0.
+      ******************************************************************
+           OPEN OUTPUT S1DQOUT0
+           MOVE FS-S1DQOUT0                 TO FS-GENERAL
+           SET SO-FILE-S1DQOUT0             TO TRUE
+           SET SO-FILE-OPERATION-OPEN       TO TRUE
+           PERFORM 4000-CHECK-FILE-STATUS
+           .
+      ******************************************************************
+        6040-WRITE-S1DQOUT0.
+      ******************************************************************
+           WRITE S1DQOUT0-REC
+           MOVE FS-S1DQOUT0                 TO FS-GENERAL
+           SET SO-FILE-S1DQOUT0             TO TRUE
+           SET SO-FILE-OPERATION-WRITE      TO TRUE
+           PERFORM 4000-CHECK-FILE-STATUS
+           .
+      ******************************************************************
+        6050-CLOSE-S1DQOUT0.
+      ******************************************************************
+           CLOSE S1DQOUT0
+           MOVE FS-S1DQOUT0                 TO FS-GENERAL
+           SET SO-FILE-S1DQOUT0             TO TRUE
+           SET SO-FILE-OPERATION-CLOSE      TO TRUE
+           PERFORM 4000-CHECK-FILE-STATUS
+           .
+      ******************************************************************
+        6060-OPEN-S2DQVEG0.
+      ******************************************************************
+           OPEN OUTPUT S2DQVEG0
+           MOVE FS-S2DQVEG0                 TO FS-GENERAL
+           SET SO-FILE-S2DQVEG0             TO TRUE
+           SET SO-FILE-OPERATION-OPEN       TO TRUE
+           PERFORM 4000-CHECK-FILE-STATUS
+           .
+      ******************************************************************
+        6070-WRITE-S2DQVEG0.
+      ******************************************************************
+           WRITE S2DQVEG0-REC
+           MOVE FS-S2DQVEG0                 TO FS-GENERAL
+           SET SO-FILE-S2DQVEG0             TO TRUE
+           SET SO-FILE-OPERATION-WRITE      TO TRUE
+           PERFORM 4000-CHECK-FILE-STATUS
+           .
+      ******************************************************************
+        6080-CLOSE-S2DQVEG0.
+      ******************************************************************
+           CLOSE S2DQVEG0
+           MOVE FS-S2DQVEG0                 TO FS-GENERAL
+           SET SO-FILE-S2DQVEG0             TO TRUE
+           SET SO-FILE-OPERATION-CLOSE      TO TRUE
+           PERFORM 4000-CHECK-FILE-STATUS
+           .
+        6100-OPEN-FILES.
+           PERFORM 6030-OPEN-S1DQOUT0
+           .
+        6110-CLOSE-FILES.
+           PERFORM 6050-CLOSE-S1DQOUT0
+           .
+      ******************************************************************

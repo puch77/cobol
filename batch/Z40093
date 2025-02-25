@@ -1,0 +1,292 @@
+       IDENTIFICATION DIVISION.
+       PROGRAM-ID. Z40093.
+       AUTHOR. MONIKA PUCHALSKA.
+       DATE-WRITTEN.  25/11/2024.
+       DATE-COMPILED. 25/11/2024.
+
+      * A program that generates a summary of the amount of     *  
+      * transfers per contract, date, currency based on the     *
+      * list of transfers.                                      *
+      * At the output, the program will generate a file with    *
+      * a summary.                                              *
+      * The output record has the following structure:          *
+      * - 6-character contract number                           *
+      *- date in the format YYYY-MM-DD                          *
+      *- currency                                               *
+      *- total amount of transfers in the format 999,999,999.99 *
+       
+       ENVIRONMENT DIVISION.
+       CONFIGURATION SECTION.
+       SOURCE-COMPUTER.
+           IBM-3090.
+       OBJECT-COMPUTER.
+           IBM-3090.
+       SPECIAL-NAMES.
+               DECIMAL-POINT IS COMMA.
+
+       INPUT-OUTPUT SECTION.
+       FILE-CONTROL.
+           SELECT E1DQTST0 ASSIGN TO E1DQTST0
+           FILE STATUS IS FS-E1DQTST0.
+
+           SELECT S1DQOUT0 ASSIGN TO S1DQOUT0
+           FILE STATUS IS FS-S1DQOUT0.
+
+           SELECT S2DQVEG0 ASSIGN TO S2DQVEG0
+           FILE STATUS IS FS-S2DQVEG0.
+
+       DATA DIVISION.
+       FILE SECTION.
+       FD E1DQTST0
+           RECORDING MODE IS F
+           DATA RECORD IS E1DQTST0-REC.
+       01 E1DQTST0-REC PIC X(50).
+
+       FD S1DQOUT0
+           RECORDING MODE IS F
+           DATA RECORD IS S1DQOUT0-REC.
+       01 S1DQOUT0-REC PIC X(50).
+
+       FD S2DQVEG0
+           RECORDING MODE IS F
+           DATA RECORD IS S2DQVEG0-REC.
+       01 S2DQVEG0-REC PIC X(50).
+
+       WORKING-STORAGE SECTION.
+
+      *********************
+      *     SWITCHES      *
+      *********************
+       01 FS.
+          05 FS-GENERAL                       PIC 99.
+             88 FS-GENERAL-OK                  VALUE 00 10.
+          05 FS-E1DQTST0                      PIC 99.
+             88 FS-E1DQTST0-OK                 VALUE 00 10.
+          05 FS-S1DQOUT0                      PIC 99.
+             88 FS-S1DQOUT0-OK                 VALUE 00 10.
+          05 FS-S2DQVEG0                      PIC 99.
+             88 FS-S2DQVEG0-OK                 VALUE 00 10.
+       01 SW.
+          05 SW-E1DQTST0-EOF                  PIC X VALUE 'N'.
+             88 SO-E1DQTST0-EOF-YES                 VALUE 'Y'.
+             88 SO-E1DQTST0-EOF-NO                  VALUE 'N'.
+          05 SW-FILE-ERROR.
+             10 SW-FILE-NAME         PIC X(8).
+                88 SO-FILE-E1DQTST0   VALUE 'E1DQTST0'.
+                88 SO-FILE-S1DQOUT0   VALUE 'S1DQOUT0'.
+                88 SO-FILE-S2DQVEG0   VALUE 'S2DQVEG0'.
+             10 SW-FILE-OPERATION    PIC X(5).
+                88 SO-FILE-OPERATION-OPEN  VALUE 'OPEN'.
+                88 SO-FILE-OPERATION-CLOSE VALUE 'CLOSE'.
+                88 SO-FILE-OPERATION-READ  VALUE 'READ'.
+                88 SO-FILE-OPERATION-WRITE VALUE 'WRITE'.
+      *********************
+      *     CONSTANTS     *
+      *********************
+      *********************
+      *     VARIABLES     *
+      *********************
+       01 WS.
+          05 WS-USERNAME             PIC X(7) VALUE 'TSOUS40'.
+          05 WS-IN.
+             10 WS-IN-CONTRACT-NO         PIC 9(6).
+             10 FILLER                    PIC X(1).
+             10 WS-IN-TRANS-DATE          PIC X(10).
+             10 FILLER                    PIC X(1).
+             10 WS-IN-CURRENCY            PIC X(3).
+             10 FILLER                    PIC X(1).
+             10 WS-IN-AMOUNT              PIC 9(9)V99.
+          05 WS-TEMP-AMOUNT               PIC 9(9)V99.
+          05 WS-OUT.
+             10 WS-OUT-CONTRACT-NO        PIC 9(6).
+             10 FILLER                    PIC X(1) VALUE ';'.
+             10 WS-OUT-TRANS-DATE         PIC X(10).
+             10 FILLER                    PIC X(1) VALUE ';'.
+             10 WS-OUT-CURRENCY           PIC X(3).
+             10 FILLER                    PIC X(1) VALUE ';'.
+      *      10 WS-OUT-AMOUNT             PIC 9(9)V99.
+             10 WS-OUT-AMOUNT-FORMATED    PIC ZZZ.ZZZ.ZZZ,ZZ.
+      ******************************************************************
+      *                                                                *
+      *                PROCEDURE DIVISION                              *
+      *                                                                *
+      ******************************************************************
+       PROCEDURE DIVISION.
+
+           PERFORM  1000-INIT
+      *
+           PERFORM  2000-PROCESS
+      *
+           PERFORM  3000-FINAL
+           .
+      *
+
+      /
+      ******************************************************************
+      *                    1000-INIT                                   *
+      *                                                                *
+      ******************************************************************
+       1000-INIT.
+      *
+           DISPLAY '1000-INIT'
+           .
+      /
+      ******************************************************************
+      *                                                                *
+      *                     2000-PROCESS                               *
+      *                                                                *
+      ******************************************************************
+      *
+       2000-PROCESS.
+      *
+           DISPLAY '2000-PROCESS'
+           PERFORM 6100-OPEN-FILES
+           PERFORM 6010-READ-E1DQTST0
+      * VARIABLE INITIALIZATION
+           PERFORM 2010-GROUP-INIT
+           PERFORM UNTIL SO-E1DQTST0-EOF-YES
+      * IF THE CONTRACT NO., CURRENCY AND TRANSACTION DATE ARE THE SAME
+      * SUM THE TRANSACTION AMOUNTS INTO A TEMPORARY VARIABLE
+             IF (WS-IN-CONTRACT-NO = WS-OUT-CONTRACT-NO
+                      AND WS-IN-TRANS-DATE = WS-OUT-TRANS-DATE
+                      AND WS-IN-CURRENCY = WS-OUT-CURRENCY)
+                ADD WS-IN-AMOUNT TO WS-TEMP-AMOUNT
+                PERFORM 6010-READ-E1DQTST0
+      * IF A NEW DATA-GROUP COMES, WRITE THE SUM FROM THE PREVIOUS
+      * INTO THE FORMATTED VARIABLE AND WRITE THE RECORD INTO THE FILE
+             ELSE
+                MOVE WS-TEMP-AMOUNT TO WS-OUT-AMOUNT-FORMATED
+                MOVE WS-OUT TO S1DQOUT0-REC
+                PERFORM 6040-WRITE-S1DQOUT0
+      * FOR THE NEW DATA-GROUP INITIALIZE THE VARIABLES
+                PERFORM 2010-GROUP-INIT
+             END-IF
+           END-PERFORM.
+      * AFTER THE EOF WRITE THE LAST DATA INTO THE OUTPUT FILE
+           MOVE WS-TEMP-AMOUNT TO WS-OUT-AMOUNT-FORMATED
+           MOVE WS-OUT TO S1DQOUT0-REC
+           PERFORM 6040-WRITE-S1DQOUT0
+           PERFORM 6110-CLOSE-FILES
+           .
+      *
+       2010-GROUP-INIT.
+      *
+           MOVE WS-IN-CONTRACT-NO TO WS-OUT-CONTRACT-NO
+           MOVE WS-IN-TRANS-DATE TO WS-OUT-TRANS-DATE
+           MOVE WS-IN-CURRENCY TO WS-OUT-CURRENCY
+           MOVE 0 TO WS-TEMP-AMOUNT
+           .
+      ******************************************************************
+      *                                                                *
+      *                       3000-FINAL                               *
+      *                                                                *
+      ******************************************************************
+      *
+      *
+       3000-FINAL.
+      *
+           DISPLAY '3000-FINAL'
+           STOP RUN
+           .
+        4000-CHECK-FILE-STATUS.
+           IF NOT FS-GENERAL-OK
+              DISPLAY 'ERROR IN FILE PROCESSING'
+              DISPLAY 'FILE:        ' SW-FILE-NAME
+              DISPLAY 'OPERATION:   ' SW-FILE-OPERATION
+              DISPLAY 'FILE STATUS: ' FS-GENERAL
+              PERFORM 3000-FINAL
+           END-IF
+           .
+      ******************************************************************
+        6000-OPEN-E1DQTST0.
+      ******************************************************************
+           OPEN INPUT E1DQTST0
+           MOVE FS-E1DQTST0                 TO FS-GENERAL
+           SET SO-FILE-E1DQTST0             TO TRUE
+           SET SO-FILE-OPERATION-OPEN       TO TRUE
+           PERFORM 4000-CHECK-FILE-STATUS
+           .
+      ******************************************************************
+        6010-READ-E1DQTST0.
+      ******************************************************************
+           READ E1DQTST0 INTO WS-IN
+             AT END SET SO-E1DQTST0-EOF-YES TO TRUE
+           MOVE FS-E1DQTST0                 TO FS-GENERAL
+           SET SO-FILE-E1DQTST0             TO TRUE
+           SET SO-FILE-OPERATION-READ       TO TRUE
+           PERFORM 4000-CHECK-FILE-STATUS
+           .
+      ******************************************************************
+        6020-CLOSE-E1DQTST0.
+      ******************************************************************
+           CLOSE E1DQTST0
+           MOVE FS-E1DQTST0                 TO FS-GENERAL
+           SET SO-FILE-E1DQTST0             TO TRUE
+           SET SO-FILE-OPERATION-CLOSE      TO TRUE
+           PERFORM 4000-CHECK-FILE-STATUS
+           .
+      ******************************************************************
+        6030-OPEN-S1DQOUT0.
+      ******************************************************************
+           OPEN OUTPUT S1DQOUT0
+           MOVE FS-S1DQOUT0                 TO FS-GENERAL
+           SET SO-FILE-S1DQOUT0             TO TRUE
+           SET SO-FILE-OPERATION-OPEN       TO TRUE
+           PERFORM 4000-CHECK-FILE-STATUS
+           .
+      ******************************************************************
+        6040-WRITE-S1DQOUT0.
+      ******************************************************************
+           WRITE S1DQOUT0-REC
+           MOVE FS-S1DQOUT0                 TO FS-GENERAL
+           SET SO-FILE-S1DQOUT0             TO TRUE
+           SET SO-FILE-OPERATION-WRITE      TO TRUE
+           PERFORM 4000-CHECK-FILE-STATUS
+           .
+      ******************************************************************
+        6050-CLOSE-S1DQOUT0.
+      ******************************************************************
+           CLOSE S1DQOUT0
+           MOVE FS-S1DQOUT0                 TO FS-GENERAL
+           SET SO-FILE-S1DQOUT0             TO TRUE
+           SET SO-FILE-OPERATION-CLOSE      TO TRUE
+           PERFORM 4000-CHECK-FILE-STATUS
+           .
+      ******************************************************************
+        6060-OPEN-S2DQVEG0.
+      ******************************************************************
+           OPEN OUTPUT S2DQVEG0
+           MOVE FS-S2DQVEG0                 TO FS-GENERAL
+           SET SO-FILE-S2DQVEG0             TO TRUE
+           SET SO-FILE-OPERATION-OPEN       TO TRUE
+           PERFORM 4000-CHECK-FILE-STATUS
+           .
+      ******************************************************************
+        6070-WRITE-S2DQVEG0.
+      ******************************************************************
+           WRITE S2DQVEG0-REC
+           MOVE FS-S2DQVEG0                 TO FS-GENERAL
+           SET SO-FILE-S2DQVEG0             TO TRUE
+           SET SO-FILE-OPERATION-WRITE      TO TRUE
+           PERFORM 4000-CHECK-FILE-STATUS
+           .
+      ******************************************************************
+        6080-CLOSE-S2DQVEG0.
+      ******************************************************************
+           CLOSE S2DQVEG0
+           MOVE FS-S2DQVEG0                 TO FS-GENERAL
+           SET SO-FILE-S2DQVEG0             TO TRUE
+           SET SO-FILE-OPERATION-CLOSE      TO TRUE
+           PERFORM 4000-CHECK-FILE-STATUS
+           .
+        6100-OPEN-FILES.
+           PERFORM 6000-OPEN-E1DQTST0
+           PERFORM 6030-OPEN-S1DQOUT0
+      *    PERFORM 6060-OPEN-S2DQVEG0
+           .
+        6110-CLOSE-FILES.
+           PERFORM 6020-CLOSE-E1DQTST0
+           PERFORM 6050-CLOSE-S1DQOUT0
+      *    PERFORM 6080-CLOSE-S2DQVEG0
+           .
+      ******************************************************************
