@@ -1,0 +1,304 @@
+       IDENTIFICATION DIVISION.
+@@@@@  PROGRAM-ID. Z40054.
+       AUTHOR. MONIKA PUCHALSKA.
+       DATE-WRITTEN.  03/12/2024.
+       DATE-COMPILED. 03/12/2024.
+
+      ******************************************************************
+      *                         --------
+@@@@@ *                         Z40054
+      *                         --------
+      *   PROGRAM THAT SELECTS 20 RECORDS OF N-TH SET FROM TABLE
+      *   IBMUSER.CLIENTS. N TAKEN FROM SYSIN
+      *
+      *   DB2 TABLES             ACCESS
+      *   ----------             ------
+      *    CLIENTS               SELECT
+      *
+      *
+
+      *****************************************************************
+      *              ENVIRONMENT DIVISION
+      ******************************************************************
+      *
+       ENVIRONMENT DIVISION.
+      *
+       CONFIGURATION SECTION.
+      *
+       SOURCE-COMPUTER.
+           IBM-3090.
+       OBJECT-COMPUTER.
+           IBM-3090.
+       SPECIAL-NAMES.
+
+      ******************************************************************
+      *                  DATA DIVISION                                 *
+      ******************************************************************
+       DATA DIVISION.
+
+
+      ******************************************************************
+      *                  WORKING-STORAGE SECTION                       *
+      ******************************************************************
+       WORKING-STORAGE SECTION.
+
+
+      *********************
+      *     SWITCHES      *
+      *********************
+
+       01 SW.
+
+      *    SWITCH INDICATING IF CURSOR HAS MORE DATA
+           05 SW-CCLI-MORE-DATA                    PIC X(1) VALUE 'N'.
+                88 SO-CCLI-MORE-DATA-YES           VALUE 'Y'.
+                88 SO-CCLI-MORE-DATA-NO            VALUE 'N'.
+
+      *********************
+      *     CONSTANTS     *
+      *********************
+       01 CT.
+          02 CT-PROGRAM-NAME                  PIC X(8) VALUE 'Z40054'.
+          02 CT-SQLCODES.
+             05 CT-SQLCODE-OK                 PIC S9(5) VALUE 0.
+             05 CT-SQLCODE-END-OF-DATA        PIC S9(5) VALUE 100.
+      *********************
+      *     VARIABLES     *
+      *********************
+
+       01 WS.
+      *    VISIBLE ERROR CODES
+           05 WS-SQLCODE-READABLE             PIC -999.
+           05 WS-COUNT                        PIC S9(09) COMP VALUE +0.
+           05 WS-COUNT-READABLE               PIC -9(9).
+           05 WS-STATEMENT-NR                 PIC 99 VALUE 0.
+           05 WS-OPTION                       PIC X(2).
+           05 WS-OPTION-NUMBER                PIC S9(2).
+           05 WS-OPTION-1                     PIC ++9.
+           05 WS-TOTAL-RECORDS                PIC S9(9) COMP-4.
+           05 WS-START                        PIC S9(3) COMP VALUE 0.
+           05 WS-STOP                         PIC S9(3) COMP VALUE 0.
+           05 ROW-COUNT                       PIC 9(3) VALUE 0.
+      *********************
+      *     COPYBOOKS     *
+      *********************
+      *********************
+      *   DB2 DCLGENS     *
+      *********************
+
+           EXEC SQL
+              INCLUDE SQLCA
+           END-EXEC.
+
+      *    CLIENTS - TABLE WITH CLIENTS OF IBMUSER
+           EXEC SQL
+              INCLUDE CLIENTS
+           END-EXEC.
+      *********************
+      *   DB2 CURSORS     *
+      *********************
+      * CCLI CURSOR IS FOR FETCHING A GROUP OF CLIENTS
+      * BETWEEN THE ROW NUMBER WS-START AND WS-STOP,
+      * WITH USING ROW_NUMBER()
+           EXEC SQL
+             DECLARE CCLI CURSOR WITH HOLD FOR
+             SELECT *
+             FROM (
+               SELECT
+                 ROW_NUMBER() OVER (ORDER BY CLI_NUMBER) AS ROW_NUM,
+                 A.*
+               FROM IBMUSER.CLIENTS A
+             ) AS SUBQUERY
+             WHERE ROW_NUM BETWEEN :WS-START AND :WS-STOP
+           END-EXEC.
+      *
+      ******************************************************************
+      *                                                                *
+      *                PROCEDURE DIVISION                              *
+      *                                                                *
+      ******************************************************************
+       PROCEDURE DIVISION.
+      *
+           PERFORM  1000-INIT
+      *
+           PERFORM  2000-PROCESS
+      *
+           PERFORM  3000-FINAL.
+      *
+
+      /
+      ******************************************************************
+      *                    1000-INIT                                   *
+      *                                                                *
+      ******************************************************************
+       1000-INIT.
+      *
+           DISPLAY '1000-INIT'
+      * SAVE INPUT INTO VARIABLE WS-OPTION AND CONVERT INTO A NUMERICAL
+           ACCEPT WS-OPTION FROM SYSIN
+           DISPLAY 'OPTION: ' WS-OPTION
+           IF FUNCTION TEST-NUMVAL(WS-OPTION) NOT = 0
+               DISPLAY 'VALUE IS NOT NUMERIC'
+               PERFORM 3000-FINAL
+           END-IF
+           COMPUTE WS-OPTION-NUMBER = FUNCTION NUMVAL(WS-OPTION)
+      *    MOVE WS-OPTION-NUMBER TO WS-OPTION-1
+      *    DISPLAY 'OPTION: ' WS-OPTION-NUMBER ', ++9: ' WS-OPTION-1
+      * IF VALUE IS NUMERICAL AND ABOVE 0, COMPUTE WS-START AND WS-STOP
+      * RANGE BOUNDARIES.
+           IF WS-OPTION-NUMBER > 0
+             COMPUTE WS-START = (WS-OPTION-NUMBER * 2 - 2) * 10 + 1
+             COMPUTE WS-STOP = WS-OPTION-NUMBER * 20
+             PERFORM 2150-GET-MAX-RECORD-NUMBER
+      * IF WS-START EXCEEDS THE MAXIMAL RECORD NUMBER, EXIT THE PROGRAM.
+             IF WS-START > WS-TOTAL-RECORDS
+               DISPLAY 'MAX RECORD NUMBER ' WS-TOTAL-RECORDS ' EXCEEDED'
+               PERFORM 3000-FINAL
+             ELSE
+      * IF THE END OF THE GROUP IS LESS THAN 20 RECORDS, INFORM THAT THE
+      * LAST RECORD IS THE MAX RECORD.
+      * OTHERWISE GIVE THE WS-START AND WS-STOP RANGES
+                IF WS-STOP > WS-TOTAL-RECORDS
+                   DISPLAY 'RECORDS BETWEEN ' WS-START ' AND '
+                                              WS-TOTAL-RECORDS
+                ELSE
+                   DISPLAY 'RECORDS BETWEEN ' WS-START ' AND ' WS-STOP
+                END-IF
+             END-IF
+           ELSE
+             DISPLAY 'KEY VALUE MUST BE > 0'
+              PERFORM 3000-FINAL
+           END-IF
+           .
+      /
+      ******************************************************************
+      *                                                                *
+      *                     2000-PROCESS                               *
+      *                                                                *
+      ******************************************************************
+      *
+       2000-PROCESS.
+           DISPLAY '2000-PROCESS'
+      * GET RECORDS FROM CLIENTS
+           PERFORM 2100-GET-RECORDS
+           .
+      ******************************************************************
+      *                                                                *
+      *                2100-GET-RECORDS                               *
+      *                                                                *
+      ******************************************************************
+      *
+       2100-GET-RECORDS.
+           PERFORM 7010-OPEN-CCLI
+           PERFORM 7020-FETCH-CCLI
+
+           PERFORM UNTIL SO-CCLI-MORE-DATA-NO
+      * DISPLAY THE RECORDS WITHING THE BOUDARY RANGE
+             DISPLAY DCLCLIENTS
+             PERFORM 7020-FETCH-CCLI
+           END-PERFORM
+
+           PERFORM 7030-CLOSE-CCLI
+           .
+      *
+      * SELECT THE TOTAL RECORD NUMBER INTO WS-TOTAL-RECORDS VARIABLE
+       2150-GET-MAX-RECORD-NUMBER.
+           INITIALIZE WS-TOTAL-RECORDS
+           EXEC SQL
+             SELECT COUNT(*)
+             INTO :WS-TOTAL-RECORDS
+             FROM IBMUSER.CLIENTS
+           END-EXEC.
+      ******************************************************************
+      *                    7010-OPEN-CCLI                              *
+      *                                                                *
+      ******************************************************************
+       7010-OPEN-CCLI.
+
+           EXEC SQL
+             OPEN CCLI
+           END-EXEC
+      *
+           IF SQLCODE = CT-SQLCODE-OK
+              SET SO-CCLI-MORE-DATA-YES TO TRUE
+           ELSE
+              MOVE 3 TO WS-STATEMENT-NR
+              PERFORM 9000-DB2-ERROR-HANDLING
+           END-IF
+           .
+      ******************************************************************
+      *                    7020-FETCH-CCLI                             *
+      *                                                                *
+      ******************************************************************
+       7020-FETCH-CCLI.
+           INITIALIZE DCLCLIENTS
+
+           EXEC SQL
+             FETCH CCLI
+             INTO :DCLCLIENTS
+           END-EXEC
+      *
+           EVALUATE SQLCODE
+             WHEN CT-SQLCODE-OK
+               CONTINUE
+             WHEN CT-SQLCODE-END-OF-DATA
+               SET SO-CCLI-MORE-DATA-NO TO TRUE
+             WHEN OTHER
+               MOVE 4                       TO WS-STATEMENT-NR
+               PERFORM 9000-DB2-ERROR-HANDLING
+           END-EVALUATE
+           .
+      ******************************************************************
+      *                    7030-CLOSE-CCLI
+      *                                                                *
+      ******************************************************************
+       7030-CLOSE-CCLI.
+
+           EXEC SQL
+             CLOSE CCLI
+           END-EXEC
+      *
+           IF SQLCODE = CT-SQLCODE-OK
+              CONTINUE
+           ELSE
+              MOVE 5 TO WS-STATEMENT-NR
+              PERFORM 9000-DB2-ERROR-HANDLING
+           END-IF
+           .
+      ******************************************************************
+      *                                                                *
+      *                       3000-FINAL                               *
+      *                                                                *
+      *                     SUCCESSFUL END                             *
+      ******************************************************************
+      *
+       3000-FINAL.
+      *
+           DISPLAY '3000-FINAL'
+           STOP RUN
+           .
+      ******************************************************************
+      *                                                                *
+      *                    9000-DB2-ERROR-HANDLING                     *
+      *                                                                *
+      ******************************************************************
+       9000-DB2-ERROR-HANDLING.
+           MOVE SQLCODE          TO WS-SQLCODE-READABLE
+           DISPLAY 'SQL ERROR IN  ' CT-PROGRAM-NAME
+           DISPLAY 'SQLCODE:      ' WS-SQLCODE-READABLE
+           DISPLAY 'SQLERRMC:     ' SQLERRMC
+           DISPLAY 'STATEMENT NR: ' WS-STATEMENT-NR
+      *    PERFORM 9001-DB2-ROLLBACK
+           MOVE 12               TO RETURN-CODE
+           PERFORM 3000-FINAL
+           .
+      ******************************************************************
+      *                                                                *
+      *                    9001-DB2-ROLLBACK                           *
+      *                                                                *
+      ******************************************************************
+       9001-DB2-ROLLBACK.
+           EXEC SQL
+             ROLLBACK
+           END-EXEC
+           .

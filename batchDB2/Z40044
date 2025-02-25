@@ -1,0 +1,264 @@
+       IDENTIFICATION DIVISION.
+       PROGRAM-ID. Z40044.
+       AUTHOR. MONIKA PUCHALSKA.
+       DATE-WRITTEN.  02/12/2024.
+       DATE-COMPILED. 02/12/2024.
+
+      ******************************************************************
+      *                         --------
+      *                         Z40044
+      *                         --------
+      *   THIS PROGRAM IS FOR ITERATING THROUGH THE RECORDS IN A COPY OF
+      *   ZZDTCNT TABLE AND ROUNDING EACH COUNTRY'S POPULATION TO THE
+      *   NEAREST MILLION.
+      *
+      *   DB2 TABLES             ACCESS
+      *   ----------             ------
+      *    ZZDTCNT               SELECT
+      *
+      *    ZZDTCNT               UPDATE
+      *
+      *****************************************************************
+      *              ENVIRONMENT DIVISION
+      ******************************************************************
+      *
+       ENVIRONMENT DIVISION.
+      *
+       CONFIGURATION SECTION.
+      *
+       SOURCE-COMPUTER.
+           IBM-3090.
+       OBJECT-COMPUTER.
+           IBM-3090.
+       SPECIAL-NAMES.
+
+
+
+      ******************************************************************
+      *                  DATA DIVISION                                 *
+      ******************************************************************
+       DATA DIVISION.
+
+
+      ******************************************************************
+      *                  WORKING-STORAGE SECTION                       *
+      ******************************************************************
+       WORKING-STORAGE SECTION.
+
+
+      *********************
+      *     SWITCHES      *
+      *********************
+
+       01 SW.
+
+      *    SWITCH INDICATING IF CURSOR HAS MORE DATA
+           05 SW-CCNT-MORE-DATA           PIC X(1) VALUE 'N'.
+                88 SO-CCNT-MORE-DATA-YES           VALUE 'Y'.
+                88 SO-CCNT-MORE-DATA-NO            VALUE 'N'.
+
+      *********************
+      *     CONSTANTS     *
+      *********************
+       01 CT.
+          02 CT-PROGRAM-NAME                  PIC X(8) VALUE 'Z40044'.
+          02 CT-SQLCODES.
+             05 CT-SQLCODE-OK                 PIC S9(5) VALUE 0.
+             05 CT-SQLCODE-END-OF-DATA        PIC S9(5) VALUE 100.
+      *********************
+      *     VARIABLES     *
+      *********************
+
+       01 WS.
+      *    VISIBLE ERROR CODES
+           05 WS-SQLCODE-READABLE             PIC -999.
+           05 WS-COUNT                        PIC S9(09) COMP VALUE +0.
+           05 WS-COUNT-READABLE               PIC -9(9).
+           05 WS-STATEMENT-NR                 PIC 99 VALUE 0.
+      *********************
+      *     COPYBOOKS     *
+      *********************
+      *********************
+      *   DB2 DCLGENS     *
+      *********************
+
+           EXEC SQL
+              INCLUDE SQLCA
+           END-EXEC.
+
+      *    ZZDTCNT - TABLE WITH COUNTRY DATA
+           EXEC SQL
+              INCLUDE ZZGTCNT
+           END-EXEC.
+
+      *********************
+      *   DB2 CURSORS     *
+      *********************
+      * CCNT CURSOR IS FOR FETCHING ALL COUNTRY DETAILS
+           EXEC SQL
+             DECLARE CCNT CURSOR FOR
+             SELECT CNT_COUNTRY_CODE, CNT_COUNTRY_NAME, CNT_POPULATION
+             FROM TSOUS40.ZZDTCNT
+             FOR UPDATE OF CNT_POPULATION
+           END-EXEC.
+
+      *
+      ******************************************************************
+      *                                                                *
+      *                PROCEDURE DIVISION                              *
+      *                                                                *
+      ******************************************************************
+       PROCEDURE DIVISION.
+      *
+           PERFORM  1000-INIT
+      *
+           PERFORM  2000-PROCESS
+      *
+           PERFORM  3000-FINAL.
+      *
+
+      /
+      ******************************************************************
+      *                    1000-INIT                                   *
+      *                                                                *
+      ******************************************************************
+       1000-INIT.
+      *
+           DISPLAY '1000-INIT'
+           .
+      /
+      ******************************************************************
+      *                                                                *
+      *                     2000-PROCESS                               *
+      *                                                                *
+      ******************************************************************
+      *
+       2000-PROCESS.
+      * ROUND EACH COUNTRY'S POPULATION TO THE NEAREST MILLION
+      * AND UPDATE THE TABLE
+           PERFORM 7010-OPEN-CCNT
+           PERFORM 7020-FETCH-CCNT
+
+           PERFORM UNTIL SO-CCNT-MORE-DATA-NO
+               DISPLAY 'POPULATION BEFORE ROUNDING: '
+                            CNT-POPULATION
+      * ROUND THE POPULATION TO THE NEAREST MILLION
+               PERFORM 2100-ROUND-AND-UPDATE-POP
+               PERFORM 7020-FETCH-CCNT
+           END-PERFORM
+
+           PERFORM 7030-CLOSE-CCNT
+           .
+      ******************************************************************
+      *                                                                *
+      *                2100-ROUND-AND-UPDATE-POP                      *
+      *                                                                *
+      ******************************************************************
+      *
+       2100-ROUND-AND-UPDATE-POP.
+           EXEC SQL
+              UPDATE TSOUS40.ZZDTCNT
+              SET CNT_POPULATION = ROUND(:CNT-POPULATION / 1000000)
+                                      * 1000000
+              WHERE CURRENT OF CCNT
+           END-EXEC
+           IF SQLCODE = CT-SQLCODE-OK
+              CONTINUE
+           ELSE
+              MOVE 2 TO WS-STATEMENT-NR
+              PERFORM 9000-DB2-ERROR-HANDLING
+           END-IF
+           .
+      ******************************************************************
+      *                    7010-OPEN-CCNT                              *
+      *                                                                *
+      ******************************************************************
+       7010-OPEN-CCNT.
+
+           EXEC SQL
+             OPEN CCNT
+           END-EXEC
+      *
+           IF SQLCODE = CT-SQLCODE-OK
+              SET SO-CCNT-MORE-DATA-YES TO TRUE
+           ELSE
+              MOVE 3 TO WS-STATEMENT-NR
+              PERFORM 9000-DB2-ERROR-HANDLING
+           END-IF
+           .
+      ******************************************************************
+      *                    7020-FETCH-COFLANG1                         *
+      *                                                                *
+      ******************************************************************
+       7020-FETCH-CCNT.
+           INITIALIZE CNT-COUNTRY-CODE, CNT-COUNTRY-NAME, CNT-POPULATION
+           EXEC SQL
+             FETCH CCNT
+              INTO  :CNT-COUNTRY-CODE,
+                    :CNT-COUNTRY-NAME,
+                    :CNT-POPULATION
+           END-EXEC
+      *
+           EVALUATE SQLCODE
+             WHEN CT-SQLCODE-OK
+               CONTINUE
+             WHEN CT-SQLCODE-END-OF-DATA
+               SET SO-CCNT-MORE-DATA-NO TO TRUE
+             WHEN OTHER
+               MOVE 4                       TO WS-STATEMENT-NR
+               PERFORM 9000-DB2-ERROR-HANDLING
+           END-EVALUATE
+           .
+      ******************************************************************
+      *                    7030-CLOSE-COFLANG1
+      *                                                                *
+      ******************************************************************
+       7030-CLOSE-CCNT.
+
+           EXEC SQL
+             CLOSE CCNT
+           END-EXEC
+      *
+           IF SQLCODE = CT-SQLCODE-OK
+              CONTINUE
+           ELSE
+              MOVE 5 TO WS-STATEMENT-NR
+              PERFORM 9000-DB2-ERROR-HANDLING
+           END-IF
+           .
+      ******************************************************************
+      *                                                                *
+      *                       3000-FINAL                               *
+      *                                                                *
+      *                     SUCCESSFUL END                             *
+      ******************************************************************
+      *
+       3000-FINAL.
+      *
+           STOP RUN
+           .
+      ******************************************************************
+      *                                                                *
+      *                    9000-DB2-ERROR-HANDLING                     *
+      *                                                                *
+      ******************************************************************
+       9000-DB2-ERROR-HANDLING.
+           MOVE SQLCODE          TO WS-SQLCODE-READABLE
+           DISPLAY 'SQL ERROR IN  ' CT-PROGRAM-NAME
+           DISPLAY 'SQLCODE:      ' WS-SQLCODE-READABLE
+           DISPLAY 'SQLERRMC:     ' SQLERRMC
+           DISPLAY 'STATEMENT NR: ' WS-STATEMENT-NR
+           PERFORM 9001-DB2-ROLLBACK
+           MOVE 12               TO RETURN-CODE
+           PERFORM 3000-FINAL
+           .
+      ******************************************************************
+      *                                                                *
+      *                    9001-DB2-ROLLBACK                           *
+      *                                                                *
+      ******************************************************************
+       9001-DB2-ROLLBACK.
+           EXEC SQL
+             ROLLBACK
+           END-EXEC
+           .

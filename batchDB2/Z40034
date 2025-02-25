@@ -1,0 +1,328 @@
+       IDENTIFICATION DIVISION.
+       PROGRAM-ID. Z40034.
+       AUTHOR. MONIKA PUCHALSKA.
+       DATE-WRITTEN.  02/12/2024.
+       DATE-COMPILED. 02/12/2024.
+
+      ******************************************************************
+      *                         --------                               *
+      *  PROGRAM THAT USES IBMUSER.CLIENTS DATA AS INPUT AND WRITES    *
+      *  RECORDS FROM INPUT TO OUTPUT ONLY FOR CLIENTS COMING FROM     *
+      *  THE COUNTRIES DEFINED IN TSOUS03.ZZDTCNT                      *
+      *  DATA PROCEEDED BY COUNTRY NAME                                *
+      *                         --------                               *
+      *                                                                *
+      *                                                                *
+      *   DB2 TABLES             ACCESS                                *
+      *   ----------             ------                                *
+      *   TSOUS40.ZZDTCNT        SELECT                                *
+      *   IBMUSER.CLIENTS        SELECT (UNLOADED TO A FILE            *
+      *                              TSOUS40.COBOL.CLIENTS.UNLOAD)     *
+
+       ENVIRONMENT DIVISION.
+       CONFIGURATION SECTION.
+       SOURCE-COMPUTER.
+           IBM-3090.
+       OBJECT-COMPUTER.
+           IBM-3090.
+       SPECIAL-NAMES.
+       INPUT-OUTPUT SECTION.
+       FILE-CONTROL.
+           SELECT E1DQTST0 ASSIGN TO E1DQTST0
+           FILE STATUS IS FS-E1DQTST0.
+
+           SELECT S1DQOUT0 ASSIGN TO S1DQOUT0
+           FILE STATUS IS FS-S1DQOUT0.
+
+       DATA DIVISION.
+       FILE SECTION.
+       FD E1DQTST0
+           RECORDING MODE IS F
+           DATA RECORD IS E1DQTST0-REC.
+       01 E1DQTST0-REC PIC X(250).
+
+       FD S1DQOUT0
+           RECORDING MODE IS F
+           DATA RECORD IS S1DQOUT0-REC.
+       01 S1DQOUT0-REC PIC X(250).
+
+       WORKING-STORAGE SECTION.
+
+      *********************
+      *     SWITCHES      *
+      *********************
+       01 FS.
+          05 FS-GENERAL                       PIC 99.
+             88 FS-GENERAL-OK                  VALUE 00 10.
+          05 FS-E1DQTST0                      PIC 99.
+             88 FS-E1DQTST0-OK                 VALUE 00 10.
+          05 FS-S1DQOUT0                      PIC 99.
+             88 FS-S1DQOUT0-OK                 VALUE 00 10.
+       01 SW.
+          05 SW-E1DQTST0-EOF                  PIC X VALUE 'N'.
+             88 SO-E1DQTST0-EOF-YES                 VALUE 'Y'.
+             88 SO-E1DQTST0-EOF-NO                  VALUE 'N'.
+          05 SW-FILE-ERROR.
+             10 SW-FILE-NAME         PIC X(8).
+                88 SO-FILE-E1DQTST0   VALUE 'E1DQTST0'.
+                88 SO-FILE-S1DQOUT0   VALUE 'S1DQOUT0'.
+             10 SW-FILE-OPERATION    PIC X(5).
+                88 SO-FILE-OPERATION-OPEN  VALUE 'OPEN'.
+                88 SO-FILE-OPERATION-CLOSE VALUE 'CLOSE'.
+                88 SO-FILE-OPERATION-READ  VALUE 'READ'.
+                88 SO-FILE-OPERATION-WRITE VALUE 'WRITE'.
+      *    SWITCH INDICATING IF CURSOR HAS MORE DATA
+          05 SW-CCNT-MORE-DATA            PIC X(1) VALUE 'N'.
+                88 SO-CCNT-MORE-DATA-YES           VALUE 'Y'.
+                88 SO-CCNT-MORE-DATA-NO            VALUE 'N'.
+          05 SW-IS-COUNTRY-ON-LIST            PIC X(1) VALUE 'N'.
+                88 SO-COUNTRY-FOUND                VALUE 'Y'.
+                88 SO-COUNTRY-NOT-FOUND            VALUE 'N'.
+          05 SW-IS-COUNTRY-CHANGE             PIC X(1) VALUE 'Y'.
+                88 SO-COUNTRY-CHANGED              VALUE 'Y'.
+                88 SO-COUNTRY-NOT-CHANGED          VALUE 'N'.
+      *********************
+      *     CONSTANTS     *
+      *********************
+       01 CT.
+          02 CT-PROGRAM-NAME                  PIC X(8) VALUE 'Z40034'.
+          02 CT-SQLCODES.
+             05 CT-SQLCODE-OK                 PIC S9(5) VALUE 0.
+             05 CT-SQLCODE-END-OF-DATA        PIC S9(5) VALUE 100.
+      *********************
+      *     VARIABLES     *
+      *********************
+       01 WS.
+          05 WS-USERNAME             PIC X(7) VALUE 'TSOUS40'.
+      *    VISIBLE ERROR CODES
+          05 WS-SQLCODE-READABLE             PIC -999.
+          05 WS-COUNT                        PIC S9(09) COMP VALUE +0.
+          05 WS-COUNT-READABLE               PIC -9(9).
+          05 WS-STATEMENT-NR                 PIC 99 VALUE 0.
+          05 WS-IN.
+             10 WS-CLI-NUMBER        PIC S9(9) USAGE COMP.
+             10 WS-CLI-FIRST-NAME    PIC X(30).
+             10 WS-CLI-LAST-NAME     PIC X(30).
+             10 WS-CLI-COUNTRY       PIC X(2).
+             10 WS-CLI-CITY          PIC X(30).
+             10 WS-CLI-ZIPCODE       PIC X(6).
+             10 WS-CLI-ADDRESS       PIC X(50).
+             10 WS-CLI-EMAIL         PIC X(40).
+             10 WS-CLI-TEL           PIC X(14).
+             10 WS-CLI-USER-MOD      PIC X(8).
+             10 WS-CLI-TIMEST-MOD    PIC X(26).
+          05 WS-CLI-COUNTRY-TEMP     PIC X(2).
+      *********************
+      *   DB2 DCLGENS     *
+      *********************
+           EXEC SQL
+              INCLUDE SQLCA
+           END-EXEC.
+
+      *    ZZDTCNT - TABLE WITH COUNTRY DATA
+           EXEC SQL
+              INCLUDE ZZGTCNT
+           END-EXEC.
+
+      *********************
+      *   DB2 CURSORS     *
+      *********************
+      ******************************************************************
+      *                                                                *
+      *                PROCEDURE DIVISION                              *
+      *                                                                *
+      ******************************************************************
+       PROCEDURE DIVISION.
+
+           PERFORM  1000-INIT
+      *
+           PERFORM  2000-PROCESS
+      *
+           PERFORM  3000-FINAL
+           .
+      *
+
+      /
+      ******************************************************************
+      *                    1000-INIT                                   *
+      *                                                                *
+      ******************************************************************
+       1000-INIT.
+      *
+           DISPLAY '1000-INIT'
+           .
+      /
+      ******************************************************************
+      *                                                                *
+      *                     2000-PROCESS                               *
+      *                                                                *
+      ******************************************************************
+      *
+       2000-PROCESS.
+      *
+           DISPLAY '2000-PROCESS'
+      * READ RECORD FROM DATA UNLOADED FROM IBMUSER.CLIENTS
+      * CALL THE ROUTINE TO RETURN A COUNTRY FULL NAME
+           PERFORM 6100-OPEN-FILES
+           PERFORM 6010-READ-E1DQTST0
+           PERFORM 7005-GET-COUNTRY-NAME
+           PERFORM UNTIL SO-E1DQTST0-EOF-YES
+      * IF COUNTRY CODE FROM CLIENTS FITS THE ONE FROM ZZDTCNT,
+      * CHECK IF THIS IS A NEW COUNTRY OR THE SAME AS IN PREVIOUS RECORD
+              EVALUATE TRUE
+                   WHEN SO-COUNTRY-FOUND
+                         EVALUATE TRUE
+      * IF COUNTRY CHANGED THEN WRITE A HEADER WITH THE COUNTRY NAME
+                            WHEN SO-COUNTRY-CHANGED
+                              MOVE WS-CLI-COUNTRY TO WS-CLI-COUNTRY-TEMP
+                              MOVE CNT-COUNTRY-NAME TO S1DQOUT0-REC
+                              PERFORM 6040-WRITE-S1DQOUT0
+                         END-EVALUATE
+      * WRITE THE RECORDS OF THE CLIENTS TABLE TO THE OUTPUT FILE
+                         MOVE WS-IN TO S1DQOUT0-REC
+                         PERFORM 6040-WRITE-S1DQOUT0
+              END-EVALUATE
+      * READ THE NEXT RECORD FROM THE CLIENTS AND IF THE COUNTRY CODE
+      * CHANGES GET THE NAME OF THE NEW COUNTRY AND SET THE FLAG
+      * THAT COUNTRY WAS CHANGED. IF NOT, SET THE FLAG THAT COUNTRY WAS
+      * NOT CHANGED
+              PERFORM 6010-READ-E1DQTST0
+              IF WS-CLI-COUNTRY NOT = WS-CLI-COUNTRY-TEMP
+                 MOVE WS-CLI-COUNTRY TO WS-CLI-COUNTRY-TEMP
+                 PERFORM 7005-GET-COUNTRY-NAME
+                 SET SO-COUNTRY-CHANGED TO TRUE
+              ELSE
+                 SET SO-COUNTRY-NOT-CHANGED TO TRUE
+              END-IF
+
+           END-PERFORM
+           PERFORM 6110-CLOSE-FILES
+           .
+      * GET THE NAME OF A COUNTRY IF IT IS EQUAL TO THE NAME FROM
+      * THE LIST. IF SUCCESS THEN SET THE FLAG THAT COUNTRY WAS FOUND
+      * IF NOT, SET THE FLAG THAT COUNTRY WAS NOT FOUND.
+      *
+       7005-GET-COUNTRY-NAME.
+      *
+           INITIALIZE CNT-COUNTRY-NAME
+      *    MOVE WS-CLI-COUNTRY TO CNT-COUNTRY-CODE
+           EXEC SQL
+              SELECT   CNT_COUNTRY_NAME
+                INTO  :CNT-COUNTRY-NAME
+              FROM     TSOUS40.ZZDTCNT
+              WHERE    CNT_COUNTRY_CODE = :WS-CLI-COUNTRY
+           END-EXEC
+           IF SQLCODE = CT-SQLCODE-OK
+              SET SO-COUNTRY-FOUND TO TRUE
+           ELSE
+              SET SO-COUNTRY-NOT-FOUND TO TRUE
+           END-IF
+           .
+      ******************************************************************
+      *                                                                *
+      *                       3000-FINAL                               *
+      *                                                                *
+      ******************************************************************
+      *
+       3000-FINAL.
+      *
+           DISPLAY '3000-FINAL'
+           STOP RUN
+           .
+        4000-CHECK-FILE-STATUS.
+           IF NOT FS-GENERAL-OK
+              DISPLAY 'ERROR IN FILE PROCESSING'
+              DISPLAY 'FILE:        ' SW-FILE-NAME
+              DISPLAY 'OPERATION:   ' SW-FILE-OPERATION
+              DISPLAY 'FILE STATUS: ' FS-GENERAL
+              PERFORM 3000-FINAL
+           END-IF
+           .
+      ******************************************************************
+        6000-OPEN-E1DQTST0.
+      ******************************************************************
+           OPEN INPUT E1DQTST0
+           MOVE FS-E1DQTST0                 TO FS-GENERAL
+           SET SO-FILE-E1DQTST0             TO TRUE
+           SET SO-FILE-OPERATION-OPEN       TO TRUE
+           PERFORM 4000-CHECK-FILE-STATUS
+           .
+      ******************************************************************
+        6010-READ-E1DQTST0.
+      ******************************************************************
+           READ E1DQTST0 INTO WS-IN
+             AT END SET SO-E1DQTST0-EOF-YES TO TRUE
+           MOVE FS-E1DQTST0                 TO FS-GENERAL
+           SET SO-FILE-E1DQTST0             TO TRUE
+           SET SO-FILE-OPERATION-READ       TO TRUE
+           PERFORM 4000-CHECK-FILE-STATUS
+           .
+      ******************************************************************
+        6020-CLOSE-E1DQTST0.
+      ******************************************************************
+           CLOSE E1DQTST0
+           MOVE FS-E1DQTST0                 TO FS-GENERAL
+           SET SO-FILE-E1DQTST0             TO TRUE
+           SET SO-FILE-OPERATION-CLOSE      TO TRUE
+           PERFORM 4000-CHECK-FILE-STATUS
+           .
+      ******************************************************************
+        6030-OPEN-S1DQOUT0.
+      ******************************************************************
+           OPEN OUTPUT S1DQOUT0
+           MOVE FS-S1DQOUT0                 TO FS-GENERAL
+           SET SO-FILE-S1DQOUT0             TO TRUE
+           SET SO-FILE-OPERATION-OPEN       TO TRUE
+           PERFORM 4000-CHECK-FILE-STATUS
+           .
+      ******************************************************************
+        6040-WRITE-S1DQOUT0.
+      ******************************************************************
+           WRITE S1DQOUT0-REC
+           MOVE FS-S1DQOUT0                 TO FS-GENERAL
+           SET SO-FILE-S1DQOUT0             TO TRUE
+           SET SO-FILE-OPERATION-WRITE      TO TRUE
+           PERFORM 4000-CHECK-FILE-STATUS
+           .
+      ******************************************************************
+        6050-CLOSE-S1DQOUT0.
+      ******************************************************************
+           CLOSE S1DQOUT0
+           MOVE FS-S1DQOUT0                 TO FS-GENERAL
+           SET SO-FILE-S1DQOUT0             TO TRUE
+           SET SO-FILE-OPERATION-CLOSE      TO TRUE
+           PERFORM 4000-CHECK-FILE-STATUS
+           .
+        6100-OPEN-FILES.
+           PERFORM 6000-OPEN-E1DQTST0
+           PERFORM 6030-OPEN-S1DQOUT0
+           .
+        6110-CLOSE-FILES.
+           PERFORM 6020-CLOSE-E1DQTST0
+           PERFORM 6050-CLOSE-S1DQOUT0
+           .
+      ******************************************************************
+      *                                                                *
+      *                    9000-DB2-ERROR-HANDLING                     *
+      *                                                                *
+      ******************************************************************
+       9000-DB2-ERROR-HANDLING.
+           MOVE SQLCODE          TO WS-SQLCODE-READABLE
+           DISPLAY 'SQL ERROR IN  ' CT-PROGRAM-NAME
+           DISPLAY 'SQLCODE:      ' WS-SQLCODE-READABLE
+           DISPLAY 'SQLERRMC:     ' SQLERRMC
+           DISPLAY 'STATEMENT NR: ' WS-STATEMENT-NR
+      *    PERFORM 9001-DB2-ROLLBACK
+           MOVE 12               TO RETURN-CODE
+           PERFORM 3000-FINAL
+           .
+      ******************************************************************
+      *                                                                *
+      *                    9001-DB2-ROLLBACK                           *
+      *                                                                *
+      ******************************************************************
+       9001-DB2-ROLLBACK.
+           EXEC SQL
+             ROLLBACK
+           END-EXEC
+           .
