@@ -1,0 +1,50 @@
+       02 ZZEC4001-COPYBOOK.
+      *THE ROUTINE IS SUPPOSED TO VALIDATE 8 AND 10 CHARACTER DATE
+          05 ZZEC4001-MODE                         PIC 9.
+                88 ZZEC4001-8CHAR-INPUT            VALUE 1.
+                88 ZZEC4001-10CHAR-INPUT           VALUE 2.
+
+      *INPUT DATA STRUCTURE FOR 8 AND 10 CHARACTER DATE
+          05 ZZEC4001-INPUT.
+             06 ZZEC4001-I-DATE                PIC X(10).
+             06 ZZEC4001-I-DATE-RED8 REDEFINES ZZEC4001-I-DATE.
+                10 ZZEC4001-I-DATE8-YEAR        PIC X(4).
+                10 ZZEC4001-I-DATE8-MONTH       PIC X(2).
+                10 ZZEC4001-I-DATE8-DAY         PIC X(2).
+                10 FILLER                       PIC X(2).
+             06 ZZEC4001-I-DATE-RED10 REDEFINES ZZEC4001-I-DATE.
+                10 ZZEC4001-I-DATE10-YEAR        PIC X(4).
+                10 ZZEC4001-I-DATE10-DEL1        PIC X(1).
+                10 ZZEC4001-I-DATE10-MONTH       PIC X(2).
+                10 ZZEC4001-I-DATE10-DEL2        PIC X(1).
+                10 ZZEC4001-I-DATE10-DAY         PIC X(2).
+
+          05 ZZEC4001-OUTPUT.
+      *CHECK RETURN CODE AFTER CALL
+             06 ZZEC4001-O-RETURN-CODE           PIC 99.
+      *OPERATION PERFORMED CORRECTLY
+                88 ZZEC4001-O-RC-OK              VALUE 0.
+      *ONE OF INPUT NUMBER FIELDS IS EMPTY
+                88 ZZEC4001-O-RC-EMPTY-INPUT     VALUE 1.
+      *ONE OF INPUT NUMBER FIELDS IS NOT NUMERIC
+                88 ZZEC4001-O-RC-NON-NUMERIC     VALUE 2.
+      *DELIMITER IS WRONG
+                88 ZZEC4001-O-RC-DELIM-WRONG     VALUE 3.
+      *DATE IS NOT VALID
+                88 ZZEC4001-O-RC-DATE-INVALID    VALUE 4.
+      *MODE IS NOT VALID
+                88 ZZEC4001-O-RC-INPUT-MODE-ERR  VALUE 5.
+      *UNKNOWN ERROR (SHOULDN'T HAPPEN)
+                88 ZZEC4001-O-RC-UNKNOWN-ERR     VALUE 9.
+      *         88 ZZEC4001-O-RC-OVERFLOW        VALUE 7.
+
+             06 ZZEC4001-O-ERROR.
+      *ADDITIONAL ERROR TEXT
+                07 ZZEC4001-O-ERROR-TEXT         PIC X(100).
+                07 ZZEC4001-O-ERROR-SQL.
+                   08 ZZEC4001-O-ERROR-SQLCODE   PIC -9(5).
+                   08 ZZEC4001-O-ERROR-SQLERRMC  PIC X(70).
+
+      *RECEIVE OUTPUT DATA
+             06 ZZEC4001-O-DATA.
+                07 ZZEC4001-O-RESULT PIC X(12).

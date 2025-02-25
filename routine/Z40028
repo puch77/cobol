@@ -1,0 +1,321 @@
+       IDENTIFICATION DIVISION.
+       PROGRAM-ID. Z40028.
+       AUTHOR.        MONIKA PUCHALSKA
+       DATE-WRITTEN.  05/12/2024.
+       DATE-COMPILED. 05/12/2024.
+
+      ******************************************************************
+      *                         --------                               *
+      *                         Z40028                                 *
+      *                         --------                               *
+      *                                                                *
+      *                                                                *
+      *   DB2 TABLES             ACCESS                                *
+      *   ----------             ------                                *
+      *                                                                *
+      ******************************************************************
+      *                   ROUTINE PURPOSE:                             *
+      *                                                                *
+      * ROUTINE TO VALIDATE 8 OR 10 CHARACTER DATES IN ISO-8601 FORMAT *
+      *         (YYYY-MM-DD OR YYYYMMDD)                               *
+      * The routine handles the following errors:
+      * -day, month or year are non-numeric
+      * -delimiter in 10-character date is not a dash
+      * -empty input
+      * -invalid date (day, month and year are given and numeric,      
+      *  delimiter (if any) matches but day or month value is invalid)
+      * -invalid option
+      * -unknown error
+      *                                                                *
+      ******************************************************************
+
+      ******************************************************************
+      *              ENVIRONMENT DIVISION                              *
+      ******************************************************************
+      *
+       ENVIRONMENT DIVISION.
+      *
+       CONFIGURATION SECTION.
+      *
+       SOURCE-COMPUTER.
+           IBM-3090.
+       OBJECT-COMPUTER.
+           IBM-3090.
+       SPECIAL-NAMES.
+
+
+
+      ******************************************************************
+      *                  DATA DIVISION                                 *
+      ******************************************************************
+       DATA DIVISION.
+
+
+      ******************************************************************
+      *                  WORKING-STORAGE SECTION                       *
+      ******************************************************************
+       WORKING-STORAGE SECTION.
+
+      *START OF WORKING STORAGE
+      *********************
+      *     SWITCHES      *
+      *********************
+       01 SW.
+           05 IS-LEAP-YEAR               PIC X(1) VALUE 'N'.
+              88 SO-IS-LEAP-YEAR-TRUE    VALUE 'Y'.
+              88 SO-IS-LEAP-YEAR-FALSE   VALUE 'N'.
+      *********************
+      *     CONSTANTS     *
+      *********************
+      *********************
+      *     VARIABLES     *
+      *********************
+       01 WS.
+           05 WS-YEAR             PIC 9(4).
+           05 WS-MONTH            PIC 99.
+           05 WS-DAY              PIC 99.
+           05 WS-DELIMITER-1      PIC X.
+           05 WS-DELIMITER-2      PIC X.
+           05 WS-LENGTH           PIC 9(2) VALUE 0.
+           05 WS-TRIMMED-DATE     PIC X(12).
+       01  MONTH-DATA.
+           05 MONTH-TABLE OCCURS 12 TIMES.
+             10 DAYS-IN-MONTH PIC 99 VALUE ZEROS.
+      *********************
+      *     COPYBOOKS     *
+      *********************
+       LINKAGE SECTION.
+       01 ZZEC4001.
+          COPY ZZEC4001.
+      *********************
+      *   DB2 DCLGENS     *
+      *********************
+
+      *********************
+      *   DB2 CURSORS     *
+      *********************
+      *
+      ******************************************************************
+      *                                                                *
+      *                PROCEDURE DIVISION                              *
+      *                                                                *
+      ******************************************************************
+       PROCEDURE DIVISION USING ZZEC4001.
+      *
+
+           PERFORM  1000-INIT
+      *
+           PERFORM  2000-PROCESS
+      *
+           PERFORM  3000-FINAL.
+      *
+
+      /
+      ******************************************************************
+      *                    1000-INIT                                   *
+      *                                                                *
+      ******************************************************************
+       1000-INIT.
+      *
+      *    DISPLAY 'INIT ROUTINE'
+           PERFORM 1010-INTIALIZE-DATA
+           .
+      ******************************************************************
+      *                     1010-INTIALIZE-DATA                        *
+      ******************************************************************
+      * INITIALIZE THE DATA
+      *
+       1010-INTIALIZE-DATA.
+           INITIALIZE WS
+           MOVE 31 TO DAYS-IN-MONTH(1)
+           MOVE 28 TO DAYS-IN-MONTH(2)
+           MOVE 31 TO DAYS-IN-MONTH(3)
+           MOVE 30 TO DAYS-IN-MONTH(4)
+           MOVE 31 TO DAYS-IN-MONTH(5)
+           MOVE 30 TO DAYS-IN-MONTH(6)
+           MOVE 31 TO DAYS-IN-MONTH(7)
+           MOVE 31 TO DAYS-IN-MONTH(8)
+           MOVE 30 TO DAYS-IN-MONTH(9)
+           MOVE 31 TO DAYS-IN-MONTH(10)
+           MOVE 30 TO DAYS-IN-MONTH(11)
+           MOVE 31 TO DAYS-IN-MONTH(12)
+
+           SET ZZEC4001-O-RC-UNKNOWN-ERR TO TRUE
+      *    EVALUATE TRUE
+      *      WHEN ZZEC4001-8CHAR-INPUT OR ZZEC4001-10CHAR-INPUT
+      *        PERFORM 2110-EXTRACT-DATE
+      *      WHEN OTHER
+      *        MOVE 'INPUT MODE ERROR' TO ZZEC4001-O-ERROR-TEXT
+      *        SET ZZEC4001-O-RC-INPUT-MODE-ERR TO TRUE
+      *        PERFORM 3000-FINAL
+      *    END-EVALUATE
+           .
+      /
+      ******************************************************************
+      *                                                                *
+      *                     2000-PROCESS                               *
+      *                                                                *
+      ******************************************************************
+      *
+       2000-PROCESS.
+      * CHECK IF PROGRAM IS RUNNING IN ANY OF THE RECOGNIZED MODES.
+      * DPENDING ON DATE FORMAT, EXTRACT THE INPUT DATE AND PERFORM
+      * VALIDATION.
+      * OTHERWISE RETURN AN ERROR.
+           EVALUATE TRUE
+             WHEN ZZEC4001-8CHAR-INPUT
+               PERFORM 2110-EXTRACT-DATE
+               PERFORM 2010-VAL-8CHAR
+             WHEN ZZEC4001-10CHAR-INPUT
+               PERFORM 2110-EXTRACT-DATE
+               PERFORM 2020-VAL-10CHAR
+             WHEN OTHER
+               MOVE 'INPUT MODE ERROR' TO ZZEC4001-O-ERROR-TEXT
+               SET ZZEC4001-O-RC-INPUT-MODE-ERR TO TRUE
+               PERFORM 3000-FINAL
+           END-EVALUATE
+
+           SET ZZEC4001-O-RC-OK TO TRUE
+           .
+      ******************************************************************
+       2110-EXTRACT-DATE.
+      * DEPENDING ON THE INPUT DATE LENGTH, EXTRACT DATE INTO DIFFERENT
+      * STRUCTURES, WITH OR WITHOUT DELIMITER.
+      * IF INPUT IS EMPTY, RETURN AN ERROR.
+           INSPECT ZZEC4001-I-DATE TALLYING WS-LENGTH
+               FOR CHARACTERS BEFORE INITIAL SPACE
+           DISPLAY 'INPUT LENGTH: ' WS-LENGTH
+           IF WS-LENGTH = 10
+                MOVE ZZEC4001-I-DATE10-YEAR  TO WS-YEAR
+                MOVE ZZEC4001-I-DATE10-DEL1  TO WS-DELIMITER-1
+                MOVE ZZEC4001-I-DATE10-MONTH TO WS-MONTH
+                MOVE ZZEC4001-I-DATE10-DEL2  TO WS-DELIMITER-2
+                MOVE ZZEC4001-I-DATE10-DAY   TO WS-DAY
+           ELSE
+                IF WS-LENGTH = 8
+                    MOVE ZZEC4001-I-DATE8-YEAR  TO WS-YEAR
+                    MOVE ZZEC4001-I-DATE8-MONTH TO WS-MONTH
+                    MOVE ZZEC4001-I-DATE8-DAY   TO WS-DAY
+                ELSE
+                    PERFORM 7900-IF-EMPTY
+                    MOVE 'INVALID DATE FORMAT LENGTH'
+                                          TO ZZEC4001-O-ERROR-TEXT
+                    SET ZZEC4001-O-RC-INPUT-MODE-ERR TO TRUE
+                    PERFORM 3000-FINAL
+                END-IF
+           END-IF.
+      ******************************************************************
+      *                     2010-VAL-8CHAR                             *
+      ******************************************************************
+       2010-VAL-8CHAR.
+      * IF NON NUMERIC
+           PERFORM 7000-IF-NUMERIC
+      * IF DATE NOT VALID
+           PERFORM 7100-IF-DATE-VALID
+      * IF ALL CORRECT THEN DISPLAY THE DATE
+           DISPLAY WS-YEAR WS-MONTH WS-DAY
+           .
+      ******************************************************************
+      *                    2020-VAL-10CHAR                             *
+      ******************************************************************
+       2020-VAL-10CHAR.
+      * IF NON NUMERIC
+           PERFORM 7000-IF-NUMERIC
+      * IF DATE NOT VALID
+           PERFORM 7100-IF-DATE-VALID
+      * IF DELIMITER INVALID
+           PERFORM 7200-IF-DELIM-VALID
+      * IF ALL CORRECT THEN DISPLAY THE DATE
+           DISPLAY WS-YEAR WS-DELIMITER-1 WS-MONTH WS-DELIMITER-2 WS-DAY
+           .
+      ******************************************************************
+      *                     7000-IF-NUMERIC                            *
+      ******************************************************************
+       7000-IF-NUMERIC.
+           IF WS-YEAR NUMERIC AND WS-MONTH NUMERIC AND WS-DAY NUMERIC
+             CONTINUE
+           ELSE
+              MOVE 'NON-NUMERIC VALUES IN DATE' TO ZZEC4001-O-ERROR-TEXT
+              SET ZZEC4001-O-RC-NON-NUMERIC TO TRUE
+              PERFORM 3000-FINAL
+           END-IF
+           SET ZZEC4001-O-RC-OK TO TRUE.
+      ******************************************************************
+      *                   7100-IF-DATE-VALID                           *
+      ******************************************************************
+       7100-IF-DATE-VALID.
+      *    DISPLAY WS-YEAR ', ' WS-MONTH ', ' WS-DAY ', '
+      *             DAYS-IN-MONTH(WS-MONTH)
+           IF WS-MONTH < 1 OR WS-MONTH > 12
+             MOVE 'INVALID MONTH' TO ZZEC4001-O-ERROR-TEXT
+             SET ZZEC4001-O-RC-DATE-INVALID TO TRUE
+             PERFORM 3000-FINAL
+           END-IF
+           IF WS-DAY < 1 OR WS-DAY > DAYS-IN-MONTH(WS-MONTH)
+      * IF A DAY IS WRONG, CHECK IF IT IS NOT FEBRUARY 29TH (LEAP YEAR)
+      * IF NOT, RETURN AN ERROR.
+             PERFORM 7500-IF-LEAP-YEAR
+             IF SO-IS-LEAP-YEAR-FALSE
+                MOVE 'INVALID DAY' TO ZZEC4001-O-ERROR-TEXT
+                SET ZZEC4001-O-RC-DATE-INVALID TO TRUE
+                PERFORM 3000-FINAL
+             END-IF
+           END-IF
+           .
+      ******************************************************************
+      *                    7500-IF-LEAP-YEAR                           *
+      ******************************************************************
+      * IF IT IS FEBRUARY CHECK IF IT IS A LEAP YEAR: DIVISIBLE BY 4 BUT
+      * NOT BY 100 OR DIVISIBLE BY 400. IF SO, SET A LEAP YEAR FLAG.
+      * IF NOT, RETURN AN ERROR FOR INVALID DATE.
+       7500-IF-LEAP-YEAR.
+           IF WS-MONTH = 2 AND WS-DAY = 29
+             IF (FUNCTION MOD(WS-YEAR, 4) = 0 AND
+                   FUNCTION MOD(WS-YEAR, 100) NOT = 0) OR
+                   (FUNCTION MOD(WS-YEAR, 400) = 0)
+                SET SO-IS-LEAP-YEAR-TRUE TO TRUE
+             ELSE
+                MOVE 'INVALID DAY FOR FEBRUARY (NON-LEAP YEAR)'
+                                         TO ZZEC4001-O-ERROR-TEXT
+                SET SO-IS-LEAP-YEAR-FALSE TO TRUE
+                SET ZZEC4001-O-RC-DATE-INVALID TO TRUE
+                PERFORM 3000-FINAL
+             END-IF
+           ELSE
+             SET SO-IS-LEAP-YEAR-FALSE TO TRUE
+           END-IF.
+      ******************************************************************
+      *                     7200-IF-DELIM-VALID                        *
+      ******************************************************************
+      * IF DELIMITER IS NOT '-' RETURN AN ERROR.
+       7200-IF-DELIM-VALID.
+           IF WS-DELIMITER-1 = '-' AND WS-DELIMITER-2 = '-'
+             CONTINUE
+           ELSE
+              MOVE 'DELIMITER INVALID' TO ZZEC4001-O-ERROR-TEXT
+              SET ZZEC4001-O-RC-DELIM-WRONG TO TRUE
+              PERFORM 3000-FINAL
+           END-IF
+           SET ZZEC4001-O-RC-OK TO TRUE.
+      ******************************************************************
+      *                 7900-IF-EMPTY                                  *
+      ******************************************************************
+      * IF THE INPUT IS EMPTY RETURN AN ERROR.
+       7900-IF-EMPTY.
+           IF ZZEC4001-I-DATE = SPACES OR LOW-VALUE
+                MOVE 'EMPTY INPUT' TO ZZEC4001-O-ERROR-TEXT
+                SET ZZEC4001-O-RC-EMPTY-INPUT TO TRUE
+                PERFORM 3000-FINAL
+           END-IF.
+      ******************************************************************
+      *                       3000-FINAL                               *
+      *                                                                *
+      *                     SUCCESSFUL END                             *
+      ******************************************************************
+      *
+       3000-FINAL.
+      *
+      *    DISPLAY 'FINAL RUT'
+           GOBACK
+           .
+      ******************************************************************
